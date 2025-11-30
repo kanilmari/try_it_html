@@ -2,7 +2,7 @@
 <html lang="fi">
 <head>
   <meta charset="UTF-8" />
-  <title>Yksinkertainen TryIt-editori</title>
+  <title>Simple TryIt editor</title>
   <style>
     * {
       box-sizing: border-box;
@@ -117,22 +117,22 @@
   </style>
 </head>
 <body>
-  <header>
-    Yksinkertainen TryIt-editori (HTML + CSS + JS)
-  </header>
+<header>
+  Simple TryIt editor (HTML + CSS + JS)
+</header>
 
-  <main>
-    <div class="top-bar">
-      <div>
-        Muokkaa alla olevaa HTML:ää ja paina <strong>Aja</strong>.<br>
-        <span class="tab-id" id="tabInfo"></span>
-        <div id="status" class="status status-info"></div>
-      </div>
-      <div class="buttons">
-        <button class="run" onclick="runCode()">Aja ▶</button>
-        <button class="reset" onclick="resetTemplate()">Palauta pohja</button>
-      </div>
+<main>
+  <div class="top-bar">
+    <div>
+      Edit the HTML below and press <strong>Run</strong>.<br>
+      <span class="tab-id" id="tabInfo"></span>
+      <div id="status" class="status status-info"></div>
     </div>
+    <div class="buttons">
+      <button class="run" onclick="runCode()">Run ▶</button>
+      <button class="reset" onclick="resetTemplate()">Reset template</button>
+    </div>
+  </div>
 
     <div class="panes">
       <textarea id="code"></textarea>
@@ -226,7 +226,7 @@
       if (storageDisabled) return;
 
       const MAX_ITEMS = 20;
-      const TTL = 1000 * 60 * 60 * 24 * 30; // 30 päivää
+      const TTL = 1000 * 60 * 60 * 24 * 30; // 30 days
       const now = Date.now();
       const entries = [];
 
@@ -247,7 +247,7 @@
         }
       }
 
-      entries.sort((a, b) => b.updatedAt - a.updatedAt); // uusin ensin
+      entries.sort((a, b) => b.updatedAt - a.updatedAt); // newest first
       if (entries.length > MAX_ITEMS) {
         for (let i = MAX_ITEMS; i < entries.length; i++) {
           localStorage.removeItem(entries[i].key);
@@ -266,8 +266,8 @@
         localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
         cleanupOldEntries();
       } catch (e) {
-        // Kvota täynnä tai storage muuten estynyt → siirry pysyvään yksityiseen tilaan
-        disableStorage("Tallennus epäonnistui: localStorage täynnä tai estetty. Siirrytty yksityiseen tilaan, koodia ei enää tallenneta selaimeen.");
+        // Quota full or storage otherwise blocked → switch to permanent private mode
+        disableStorage("Saving failed: localStorage is full or blocked. Switched to private mode, code will no longer be saved in the browser.");
       }
     }
 
@@ -309,9 +309,9 @@
         }
       }
 
-      // joko storage ei ole käytössä tai mitään ei ollut tallessa
+      // either storage is not available or nothing was saved
       codeEl.value = defaultTemplate;
-      previewEl.srcdoc = codeEl.value; // yksityinen tila: ei tallennusta
+      previewEl.srcdoc = codeEl.value; // private mode: no saving
     }
 
     window.addEventListener("load", init);
