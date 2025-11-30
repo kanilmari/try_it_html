@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fi">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>Simple TryIt editor</title>
@@ -8,10 +8,37 @@
       box-sizing: border-box;
     }
 
+    :root {
+      --bg: #f4f4f4;
+      --text: #111827;
+      --panel-bg: #ffffff;
+      --border: #cccccc;
+      --header-bg: #20232a;
+      --header-text: #ffffff;
+      --button-run-bg: #2e7d32;
+      --button-run-text: #ffffff;
+      --button-reset-bg: #e0e0e0;
+      --button-reset-text: #111827;
+    }
+
+    body[data-theme="dark"] {
+      --bg: #020617;
+      --text: #e5e7eb;
+      --panel-bg: #0b1120;
+      --border: #1f2937;
+      --header-bg: #020617;
+      --header-text: #e5e7eb;
+      --button-run-bg: #16a34a;
+      --button-run-text: #e5e7eb;
+      --button-reset-bg: #111827;
+      --button-reset-text: #e5e7eb;
+    }
+
     body {
       margin: 0;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #f4f4f4;
+      background: var(--bg);
+      color: var(--text);
       display: flex;
       flex-direction: column;
       height: 100vh;
@@ -19,8 +46,8 @@
 
     header {
       padding: 0.75rem 1rem;
-      background: #20232a;
-      color: #fff;
+      background: var(--header-bg);
+      color: var(--header-text);
       font-size: 1rem;
     }
 
@@ -43,6 +70,28 @@
     .buttons {
       display: flex;
       gap: 0.5rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-size: 0.85rem;
+    }
+
+    .controls label {
+      opacity: 0.8;
+    }
+
+    select {
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--panel-bg);
+      color: var(--text);
+      font-size: 0.85rem;
     }
 
     button {
@@ -54,12 +103,13 @@
     }
 
     button.run {
-      background: #2e7d32;
-      color: #fff;
+      background: var(--button-run-bg);
+      color: var(--button-run-text);
     }
 
     button.reset {
-      background: #e0e0e0;
+      background: var(--button-reset-bg);
+      color: var(--button-reset-text);
     }
 
     .panes {
@@ -78,16 +128,17 @@
       font-size: 0.9rem;
       padding: 0.5rem;
       border-radius: 4px;
-      border: 1px solid #ccc;
-      background: #fff;
+      border: 1px solid var(--border);
+      background: var(--panel-bg);
+      color: var(--text);
     }
 
     iframe {
       width: 100%;
       height: 100%;
       border-radius: 4px;
-      border: 1px solid #ccc;
-      background: #fff;
+      border: 1px solid var(--border);
+      background: var(--panel-bg);
     }
 
     .tab-id {
@@ -101,11 +152,11 @@
     }
 
     .status-info {
-      color: #555;
+      color: #9ca3af;
     }
 
     .status-error {
-      color: #b71c1c;
+      color: #f97373;
     }
 
     @media (max-width: 800px) {
@@ -116,7 +167,7 @@
     }
   </style>
 </head>
-<body>
+<body data-theme="light">
 <header>
   Simple TryIt editor (HTML + CSS + JS)
 </header>
@@ -129,28 +180,36 @@
       <div id="status" class="status status-info"></div>
     </div>
     <div class="buttons">
+      <div class="controls">
+        <label for="themeSelect">Theme:</label>
+        <select id="themeSelect">
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </div>
       <button class="run" onclick="runCode()">Run ▶</button>
       <button class="reset" onclick="resetTemplate()">Reset template</button>
     </div>
   </div>
 
-    <div class="panes">
-      <textarea id="code"></textarea>
-      <iframe id="preview"></iframe>
-    </div>
-  </main>
+  <div class="panes">
+    <textarea id="code"></textarea>
+    <iframe id="preview"></iframe>
+  </div>
+</main>
 
-  <script>
-    const defaultTemplate = `<!DOCTYPE html>
-<html lang="fi">
+<script>
+  const TEMPLATES = {
+    light: `<!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Esimerkkisivu</title>
+  <title>Example page (light)</title>
   <style>
     body {
       font-family: system-ui, sans-serif;
       background: #fafafa;
-      color: #333;
+      color: #111827;
       padding: 1rem;
     }
     h1 {
@@ -160,7 +219,7 @@
       padding: 1rem;
       margin-top: 1rem;
       border-radius: 8px;
-      border: 1px solid #ddd;
+      border: 1px solid #d1d5db;
     }
   </style>
 </head>
@@ -172,149 +231,215 @@
   <button onclick="alert('JavaScript is working!')">Test JS</button>
 </div>
 </body>
-</html>`;
-
-    const codeEl = document.getElementById("code");
-    const previewEl = document.getElementById("preview");
-    const tabInfoEl = document.getElementById("tabInfo");
-    const statusEl = document.getElementById("status");
-
-    const STORAGE_PREFIX = "tryit-code-";
-    let storageDisabled = false;
-
-    const TAB_ID = getOrCreateTabId();
-    const STORAGE_KEY = STORAGE_PREFIX + TAB_ID;
-
-    tabInfoEl.textContent = "Välilehden tunniste: " + TAB_ID;
-
-    function setStatus(message, type = "info") {
-      if (!statusEl) return;
-      statusEl.textContent = message;
-      statusEl.className = "status " + (type === "error" ? "status-error" : "status-info");
+</html>`,
+    dark: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Example page (dark)</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #020617;
+      color: #e5e7eb;
+      padding: 1rem;
     }
-
-    function disableStorage(reason) {
-      storageDisabled = true;
-      setStatus(reason, "error");
+    h1 {
+      text-align: center;
     }
-
-    function detectStorageAvailability() {
-      try {
-        const testKey = STORAGE_PREFIX + "__test";
-        localStorage.setItem(testKey, "1");
-        localStorage.removeItem(testKey);
-        setStatus("Tallennus käytössä: koodi tallennetaan tämän välilehden localStorageen.");
-        return true;
-      } catch (e) {
-        disableStorage("localStorage ei ole käytettävissä, tallennus poistettu käytöstä (yksityinen tila).");
-        return false;
-      }
+    .box {
+      padding: 1rem;
+      margin-top: 1rem;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      background: #020617;
     }
-
-    function getOrCreateTabId() {
-      const url = new URL(window.location.href);
-      let id = url.searchParams.get("tab");
-      if (!id) {
-        id = Math.random().toString(36).slice(2, 10);
-        url.searchParams.set("tab", id);
-        history.replaceState(null, "", url.toString());
-      }
-      return id;
+    button {
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      border: 1px solid #4b5563;
+      background: #111827;
+      color: #e5e7eb;
     }
+  </style>
+</head>
+<body>
+<h1>Hello from the TryIt editor 👋</h1>
+<p>This is the dark theme template. You can still add any HTML, CSS and JS you like.</p>
 
-    function cleanupOldEntries() {
-      if (storageDisabled) return;
+<div class="box">
+  <button onclick="alert('JavaScript is working!')">Test JS</button>
+</div>
+</body>
+</html>`
+  };
 
-      const MAX_ITEMS = 20;
-      const TTL = 1000 * 60 * 60 * 24 * 30; // 30 days
-      const now = Date.now();
-      const entries = [];
+  const codeEl = document.getElementById("code");
+  const previewEl = document.getElementById("preview");
+  const tabInfoEl = document.getElementById("tabInfo");
+  const statusEl = document.getElementById("status");
+  const themeSelectEl = document.getElementById("themeSelect");
 
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith(STORAGE_PREFIX)) {
-          try {
-            const raw = localStorage.getItem(key);
-            const obj = JSON.parse(raw);
-            if (!obj.updatedAt || now - obj.updatedAt > TTL) {
-              localStorage.removeItem(key);
-            } else {
-              entries.push({ key, updatedAt: obj.updatedAt });
-            }
-          } catch (e) {
+  const STORAGE_PREFIX = "tryit-code-";
+  let storageDisabled = false;
+
+  const TAB_ID = getOrCreateTabId();
+  const STORAGE_KEY = STORAGE_PREFIX + TAB_ID;
+
+  let currentTheme = "light";
+
+  tabInfoEl.textContent = "Tab id: " + TAB_ID;
+
+  function setStatus(message, type = "info") {
+    if (!statusEl) return;
+    statusEl.textContent = message;
+    statusEl.className = "status " + (type === "error" ? "status-error" : "status-info");
+  }
+
+  function disableStorage(reason) {
+    storageDisabled = true;
+    setStatus(reason, "error");
+  }
+
+  function detectStorageAvailability() {
+    try {
+      const testKey = STORAGE_PREFIX + "__test";
+      localStorage.setItem(testKey, "1");
+      localStorage.removeItem(testKey);
+      setStatus("Storage enabled: code is saved to this tab's localStorage.");
+      return true;
+    } catch (e) {
+      disableStorage("localStorage is not available, autosave disabled (likely private browsing mode).");
+      return false;
+    }
+  }
+
+  function getOrCreateTabId() {
+    const url = new URL(window.location.href);
+    let id = url.searchParams.get("tab");
+    if (!id) {
+      id = Math.random().toString(36).slice(2, 10);
+      url.searchParams.set("tab", id);
+      history.replaceState(null, "", url.toString());
+    }
+    return id;
+  }
+
+  function cleanupOldEntries() {
+    if (storageDisabled) return;
+
+    const MAX_ITEMS = 20;
+    const TTL = 1000 * 60 * 60 * 24 * 30; // 30 days
+    const now = Date.now();
+    const entries = [];
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(STORAGE_PREFIX)) {
+        try {
+          const raw = localStorage.getItem(key);
+          const obj = JSON.parse(raw);
+          if (!obj.updatedAt || now - obj.updatedAt > TTL) {
             localStorage.removeItem(key);
+          } else {
+            entries.push({ key, updatedAt: obj.updatedAt });
           }
-        }
-      }
-
-      entries.sort((a, b) => b.updatedAt - a.updatedAt); // newest first
-      if (entries.length > MAX_ITEMS) {
-        for (let i = MAX_ITEMS; i < entries.length; i++) {
-          localStorage.removeItem(entries[i].key);
+        } catch (e) {
+          localStorage.removeItem(key);
         }
       }
     }
 
-    function saveToStorage() {
-      if (storageDisabled) return;
+    entries.sort((a, b) => b.updatedAt - a.updatedAt); // newest first
+    if (entries.length > MAX_ITEMS) {
+      for (let i = MAX_ITEMS; i < entries.length; i++) {
+        localStorage.removeItem(entries[i].key);
+      }
+    }
+  }
 
-      const payload = {
-        code: codeEl.value,
-        updatedAt: Date.now()
-      };
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-        cleanupOldEntries();
-      } catch (e) {
-        // Quota full or storage otherwise blocked → switch to permanent private mode
-        disableStorage("Saving failed: localStorage is full or blocked. Switched to private mode, code will no longer be saved in the browser.");
+  function saveToStorage() {
+    if (storageDisabled) return;
+
+    const payload = {
+      code: codeEl.value,
+      theme: currentTheme,
+      updatedAt: Date.now()
+    };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      cleanupOldEntries();
+    } catch (e) {
+      // Quota full or storage otherwise blocked → switch to permanent private mode
+      disableStorage("Saving failed: localStorage is full or blocked. Switched to private mode, code will no longer be saved in the browser.");
+    }
+  }
+
+  function loadFromStorage() {
+    if (storageDisabled) return null;
+
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch (e) {
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+  }
+
+  function applyTheme(theme) {
+    currentTheme = theme || "light";
+    document.body.setAttribute("data-theme", currentTheme);
+    if (themeSelectEl && themeSelectEl.value !== currentTheme) {
+      themeSelectEl.value = currentTheme;
+    }
+  }
+
+  function getDefaultTemplate() {
+    return TEMPLATES[currentTheme] || TEMPLATES.light;
+  }
+
+  function runCode() {
+    const code = codeEl.value;
+    previewEl.srcdoc = code;
+    saveToStorage();
+  }
+
+  function resetTemplate() {
+    codeEl.value = getDefaultTemplate();
+    runCode();
+  }
+
+  function init() {
+    const storageOk = detectStorageAvailability();
+
+    if (themeSelectEl) {
+      themeSelectEl.addEventListener("change", (event) => {
+        applyTheme(event.target.value);
+      });
+    }
+
+    if (storageOk) {
+      cleanupOldEntries();
+      const saved = loadFromStorage();
+      if (saved && saved.code) {
+        applyTheme(saved.theme || "light");
+        codeEl.value = saved.code;
+        runCode();
+        return;
       }
     }
 
-    function loadFromStorage() {
-      if (storageDisabled) return null;
+    // either storage is not available or nothing was saved
+    applyTheme("light");
+    codeEl.value = getDefaultTemplate();
+    previewEl.srcdoc = codeEl.value; // private mode: no saving
+  }
 
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return null;
-      try {
-        const obj = JSON.parse(raw);
-        return obj.code || null;
-      } catch (e) {
-        localStorage.removeItem(STORAGE_KEY);
-        return null;
-      }
-    }
+  // TODO: add syntax highlighting and indentation assistance for HTML elements in a later iteration.
 
-    function runCode() {
-      const code = codeEl.value;
-      previewEl.srcdoc = code;
-      saveToStorage();
-    }
-
-    function resetTemplate() {
-      codeEl.value = defaultTemplate;
-      runCode();
-    }
-
-    function init() {
-      const storageOk = detectStorageAvailability();
-
-      if (storageOk) {
-        cleanupOldEntries();
-        const saved = loadFromStorage();
-        if (saved) {
-          codeEl.value = saved;
-          runCode();
-          return;
-        }
-      }
-
-      // either storage is not available or nothing was saved
-      codeEl.value = defaultTemplate;
-      previewEl.srcdoc = codeEl.value; // private mode: no saving
-    }
-
-    window.addEventListener("load", init);
-  </script>
+  window.addEventListener("load", init);
+</script>
 </body>
 </html>
