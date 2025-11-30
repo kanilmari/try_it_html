@@ -78,6 +78,7 @@ const previewEl = document.getElementById("preview");
 const tabInfoEl = document.getElementById("tabInfo");
 const statusEl = document.getElementById("status");
 const themeSelectEl = document.getElementById("themeSelect");
+const previewDarkToggleEl = document.getElementById("previewDarkToggle");
 const panesEl = document.getElementById("panes");
 const splitterEl = document.getElementById("splitter");
 
@@ -88,6 +89,7 @@ const TAB_ID = getOrCreateTabId();
 const STORAGE_KEY = STORAGE_PREFIX + TAB_ID;
 
 let currentTheme = "light";
+let previewDarkMode = false;
 
 // CodeMirror instance (created in init)
 let codeMirror = null;
@@ -204,6 +206,12 @@ function applyTheme(theme) {
   if (themeSelectEl && themeSelectEl.value !== currentTheme) {
     themeSelectEl.value = currentTheme;
   }
+
+  // Sync CodeMirror theme with app theme
+  if (codeMirror) {
+    const cmTheme = currentTheme === "dark" ? "dracula" : "default";
+    codeMirror.setOption("theme", cmTheme);
+  }
 }
 
 function getDefaultTemplate() {
@@ -212,13 +220,39 @@ function getDefaultTemplate() {
 
 function runCode() {
   const code = getEditorValue();
-  previewEl.srcdoc = code;
+  const wrapped = wrapPreviewHtml(code, previewDarkMode);
+  previewEl.srcdoc = wrapped;
   saveToStorage();
 }
 
 function resetTemplate() {
   setEditorValue(getDefaultTemplate());
   runCode();
+}
+
+function wrapPreviewHtml(html, useDark) {
+  if (!useDark) return html;
+
+  // Naive wrapper: injects a dark-mode helper style that targets body/html
+  const darkStyle = `
+<style>
+  html, body {
+    background: #020617 !important;
+    color: #e5e7eb !important;
+  }
+  a { color: #38bdf8 !important; }
+  button, input, textarea, select {
+    background: #020617 !important;
+    color: #e5e7eb !important;
+    border-color: #475569 !important;
+  }
+</style>`;
+
+  // If the user already has a <head>, inject into it; otherwise prepend
+  if (html.includes("<head")) {
+    return html.replace(/<head([^>]*)>/i, (m) => m + darkStyle);
+  }
+  return darkStyle + html;
 }
 
 function getEditorValue() {
@@ -250,6 +284,10 @@ function init() {
       indentWithTabs: false,
     });
 
+    // Apply initial theme based on currentTheme
+    const cmInitialTheme = currentTheme === "dark" ? "dracula" : "default";
+    codeMirror.setOption("theme", cmInitialTheme);
+
     // Ensure editor resizes with the pane
     setTimeout(() => {
       if (codeMirror) {
@@ -261,6 +299,15 @@ function init() {
   if (themeSelectEl) {
     themeSelectEl.addEventListener("change", (event) => {
       applyTheme(event.target.value);
+    });
+  }
+
+  if (previewDarkToggleEl) {
+    previewDarkMode = previewDarkToggleEl.checked;
+    previewDarkToggleEl.addEventListener("change", () => {
+      previewDarkMode = previewDarkToggleEl.checked;
+      // Re-run current code to apply or remove dark wrapper
+      runCode();
     });
   }
 
@@ -290,7 +337,8 @@ function init() {
   // either storage is not available or nothing was saved
   applyTheme("light");
   setEditorValue(getDefaultTemplate());
-  previewEl.srcdoc = getEditorValue(); // private mode: no saving
+  const wrappedInitial = wrapPreviewHtml(getEditorValue(), previewDarkMode);
+  previewEl.srcdoc = wrappedInitial; // private mode: no saving
 }
 
 function updateLayoutMode() {
