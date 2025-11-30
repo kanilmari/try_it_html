@@ -109,15 +109,9 @@ button.reset {
 .panes {
   flex: 1;
   display: grid;
-  grid-template-columns: var(--pane-primary, 50%) var(--divider-size, 8px) minmax(0, 1fr);
-  grid-template-rows: 1fr;
-  gap: 0;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
   min-height: 0;
-}
-
-.panes[data-orientation="vertical"] {
-  grid-template-columns: 1fr;
-  grid-template-rows: var(--pane-primary, 50%) var(--divider-size, 8px) minmax(0, 1fr);
 }
 
 textarea {
@@ -141,27 +135,6 @@ iframe {
   background: var(--panel-bg);
 }
 
-.divider {
-  background: var(--border);
-  transition: background 0.2s ease;
-}
-
-.divider:hover,
-.divider:focus-visible,
-.divider.dragging {
-  background: color-mix(in srgb, var(--border) 50%, var(--text));
-}
-
-.panes[data-orientation="horizontal"] .divider {
-  cursor: col-resize;
-  width: var(--divider-size, 8px);
-}
-
-.panes[data-orientation="vertical"] .divider {
-  cursor: row-resize;
-  height: var(--divider-size, 8px);
-}
-
 .tab-id {
   font-size: 0.8rem;
   opacity: 0.7;
@@ -183,6 +156,6 @@ iframe {
 @media (max-width: 800px) {
   .panes {
     grid-template-columns: 1fr;
-    grid-template-rows: var(--pane-primary, 50%) var(--divider-size, 8px) minmax(0, 1fr);
+    grid-template-rows: 1fr 1fr;
   }
 }
