@@ -75,8 +75,6 @@ const TEMPLATES = {
 
 const codeEl = document.getElementById("code");
 const previewEl = document.getElementById("preview");
-const panesEl = document.getElementById("panes");
-const dividerEl = document.getElementById("divider");
 const tabInfoEl = document.getElementById("tabInfo");
 const statusEl = document.getElementById("status");
 const themeSelectEl = document.getElementById("themeSelect");
@@ -88,9 +86,6 @@ const TAB_ID = getOrCreateTabId();
 const STORAGE_KEY = STORAGE_PREFIX + TAB_ID;
 
 let currentTheme = "light";
-let layoutOrientation = "horizontal";
-let isDragging = false;
-const mediaQuery = window.matchMedia("(max-width: 800px)");
 
 tabInfoEl.textContent = "Tab id: " + TAB_ID;
 
@@ -200,102 +195,6 @@ function applyTheme(theme) {
   }
 }
 
-function applyLayoutOrientation(orientation) {
-  if (!panesEl || !dividerEl) return;
-
-  layoutOrientation = orientation;
-  panesEl.dataset.orientation = layoutOrientation;
-  dividerEl.setAttribute(
-    "aria-orientation",
-    layoutOrientation === "horizontal" ? "vertical" : "horizontal"
-  );
-}
-
-function setPrimaryPaneSize(percent) {
-  if (!panesEl) return;
-
-  const clamped = Math.min(85, Math.max(15, percent));
-  panesEl.style.setProperty("--pane-primary", `${clamped}%`);
-}
-
-function updatePaneSize(event) {
-  if (!panesEl || !isDragging) return;
-
-  const rect = panesEl.getBoundingClientRect();
-  if (layoutOrientation === "horizontal") {
-    const x = event.clientX - rect.left;
-    const percent = (x / rect.width) * 100;
-    setPrimaryPaneSize(percent);
-  } else {
-    const y = event.clientY - rect.top;
-    const percent = (y / rect.height) * 100;
-    setPrimaryPaneSize(percent);
-  }
-}
-
-function stopDragging(event) {
-  if (!dividerEl || !isDragging) return;
-
-  if (event && event.pointerId !== undefined) {
-    dividerEl.releasePointerCapture(event.pointerId);
-  }
-  isDragging = false;
-  dividerEl.classList.remove("dragging");
-  window.removeEventListener("pointermove", updatePaneSize);
-  window.removeEventListener("pointerup", stopDragging);
-}
-
-function startDragging(event) {
-  if (!dividerEl) return;
-  event.preventDefault();
-  isDragging = true;
-  dividerEl.classList.add("dragging");
-  dividerEl.setPointerCapture(event.pointerId);
-  window.addEventListener("pointermove", updatePaneSize);
-  window.addEventListener("pointerup", stopDragging);
-}
-
-function handleDividerKeyboard(event) {
-  if (!panesEl) return;
-
-  const step = 4;
-  const current = parseFloat(
-    getComputedStyle(panesEl).getPropertyValue("--pane-primary") || "50"
-  );
-
-  if (layoutOrientation === "horizontal") {
-    if (event.key === "ArrowLeft") {
-      setPrimaryPaneSize(current - step);
-      event.preventDefault();
-    } else if (event.key === "ArrowRight") {
-      setPrimaryPaneSize(current + step);
-      event.preventDefault();
-    }
-  } else {
-    if (event.key === "ArrowUp") {
-      setPrimaryPaneSize(current - step);
-      event.preventDefault();
-    } else if (event.key === "ArrowDown") {
-      setPrimaryPaneSize(current + step);
-      event.preventDefault();
-    }
-  }
-}
-
-function initDivider() {
-  if (!panesEl || !dividerEl) return;
-
-  applyLayoutOrientation(mediaQuery.matches ? "vertical" : "horizontal");
-  setPrimaryPaneSize(50);
-
-  mediaQuery.addEventListener("change", () => {
-    applyLayoutOrientation(mediaQuery.matches ? "vertical" : "horizontal");
-  });
-
-  dividerEl.addEventListener("pointerdown", startDragging);
-  dividerEl.addEventListener("keydown", handleDividerKeyboard);
-}
-
 function getDefaultTemplate() {
   return TEMPLATES[currentTheme] || TEMPLATES.light;
 }
@@ -313,8 +212,6 @@ function resetTemplate() {
 
 function init() {
   const storageOk = detectStorageAvailability();
-
-  initDivider();
 
   if (themeSelectEl) {
     themeSelectEl.addEventListener("change", (event) => {
