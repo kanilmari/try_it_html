@@ -183,7 +183,6 @@
       <div class="controls">
         <label for="themeSelect">Theme:</label>
         <select id="themeSelect">
-          <option value="system">System</option>
           <option value="light">Light</option>
           <option value="dark">Dark</option>
         </select>
@@ -287,11 +286,7 @@
   const TAB_ID = getOrCreateTabId();
   const STORAGE_KEY = STORAGE_PREFIX + TAB_ID;
 
-  // themeMode: "system" | "light" | "dark"
-  let currentThemeMode = "system";
-  // resolved theme: "light" | "dark"
   let currentTheme = "light";
-  let systemMediaQuery = null;
 
   tabInfoEl.textContent = "Tab id: " + TAB_ID;
 
@@ -368,7 +363,7 @@
 
     const payload = {
       code: codeEl.value,
-      themeMode: currentThemeMode,
+      theme: currentTheme,
       updatedAt: Date.now()
     };
     try {
@@ -393,31 +388,12 @@
     }
   }
 
-  function detectSystemTheme() {
-    if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
-      return "dark";
+  function applyTheme(theme) {
+    currentTheme = theme || "light";
+    document.body.setAttribute("data-theme", currentTheme);
+    if (themeSelectEl && themeSelectEl.value !== currentTheme) {
+      themeSelectEl.value = currentTheme;
     }
-    return "light";
-  }
-
-  function applyThemeFromMode() {
-    const resolved = currentThemeMode === "system" ? detectSystemTheme() : currentThemeMode;
-    currentTheme = resolved;
-    document.body.setAttribute("data-theme", resolved);
-
-    if (themeSelectEl && themeSelectEl.value !== currentThemeMode) {
-      themeSelectEl.value = currentThemeMode;
-    }
-  }
-
-  function watchSystemTheme() {
-    if (!window.matchMedia) return;
-    systemMediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    systemMediaQuery.addEventListener("change", () => {
-      if (currentThemeMode === "system") {
-        applyThemeFromMode();
-      }
-    });
   }
 
   function getDefaultTemplate() {
@@ -440,20 +416,15 @@
 
     if (themeSelectEl) {
       themeSelectEl.addEventListener("change", (event) => {
-        currentThemeMode = event.target.value || "system";
-        applyThemeFromMode();
-        saveToStorage();
+        applyTheme(event.target.value);
       });
     }
-
-    watchSystemTheme();
 
     if (storageOk) {
       cleanupOldEntries();
       const saved = loadFromStorage();
       if (saved && saved.code) {
-        currentThemeMode = saved.themeMode || "system";
-        applyThemeFromMode();
+        applyTheme(saved.theme || "light");
         codeEl.value = saved.code;
         runCode();
         return;
@@ -461,8 +432,7 @@
     }
 
     // either storage is not available or nothing was saved
-    currentThemeMode = "system";
-    applyThemeFromMode();
+    applyTheme("light");
     codeEl.value = getDefaultTemplate();
     previewEl.srcdoc = codeEl.value; // private mode: no saving
   }
