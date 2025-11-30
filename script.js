@@ -78,8 +78,6 @@ const previewEl = document.getElementById("preview");
 const tabInfoEl = document.getElementById("tabInfo");
 const statusEl = document.getElementById("status");
 const themeSelectEl = document.getElementById("themeSelect");
-const panesEl = document.querySelector(".panes");
-const dividerEl = document.getElementById("divider");
 
 const STORAGE_PREFIX = "tryit-code-";
 let storageDisabled = false;
@@ -88,8 +86,6 @@ const TAB_ID = getOrCreateTabId();
 const STORAGE_KEY = STORAGE_PREFIX + TAB_ID;
 
 let currentTheme = "light";
-let splitPosition = 0.5;
-let dragging = false;
 
 tabInfoEl.textContent = "Tab id: " + TAB_ID;
 
@@ -203,69 +199,6 @@ function getDefaultTemplate() {
   return TEMPLATES[currentTheme] || TEMPLATES.light;
 }
 
-function isVerticalLayout() {
-  return window.matchMedia("(max-width: 800px)").matches;
-}
-
-function setSplitPosition(value) {
-  splitPosition = Math.min(0.85, Math.max(0.15, value));
-  if (panesEl) {
-    panesEl.style.setProperty("--split", splitPosition);
-  }
-}
-
-function updateDividerOrientation() {
-  if (dividerEl) {
-    dividerEl.setAttribute(
-      "aria-orientation",
-      isVerticalLayout() ? "vertical" : "horizontal"
-    );
-  }
-}
-
-function handleDrag(event) {
-  if (!dragging || !panesEl) return;
-  const rect = panesEl.getBoundingClientRect();
-  const vertical = isVerticalLayout();
-
-  const ratio = vertical
-    ? (event.clientY - rect.top) / rect.height
-    : (event.clientX - rect.left) / rect.width;
-
-  setSplitPosition(ratio);
-}
-
-function stopDrag(event) {
-  dragging = false;
-  window.removeEventListener("pointermove", handleDrag);
-  window.removeEventListener("pointerup", stopDrag);
-  window.removeEventListener("pointercancel", stopDrag);
-  dividerEl?.releasePointerCapture?.(event.pointerId);
-}
-
-function startDrag(event) {
-  dragging = true;
-  dividerEl?.setPointerCapture?.(event.pointerId);
-  window.addEventListener("pointermove", handleDrag);
-  window.addEventListener("pointerup", stopDrag);
-  window.addEventListener("pointercancel", stopDrag);
-  handleDrag(event);
-}
-
-function initDivider() {
-  if (!panesEl || !dividerEl) return;
-
-  setSplitPosition(splitPosition);
-  updateDividerOrientation();
-  dividerEl.addEventListener("pointerdown", startDrag);
-
-  const media = window.matchMedia("(max-width: 800px)");
-  media.addEventListener("change", () => {
-    updateDividerOrientation();
-    setSplitPosition(splitPosition);
-  });
-}
-
 function runCode() {
   const code = codeEl.value;
   previewEl.srcdoc = code;
@@ -285,8 +218,6 @@ function init() {
       applyTheme(event.target.value);
     });
   }
-
-  initDivider();
 
   if (storageOk) {
     cleanupOldEntries();
