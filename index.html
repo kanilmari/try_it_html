@@ -31,8 +31,13 @@
   </div>
 
   <div class="panes">
-    <textarea id="code"></textarea>
-    <iframe id="preview"></iframe>
+    <div class="pane editor-pane">
+      <textarea id="code"></textarea>
+    </div>
+    <div class="divider" id="divider" role="separator" aria-label="Resize editor and preview" aria-orientation="horizontal"></div>
+    <div class="pane preview-pane">
+      <iframe id="preview"></iframe>
+    </div>
   </div>
 </main>
 
