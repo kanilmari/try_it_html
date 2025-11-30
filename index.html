@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="UTF-8" />
+  <title>Yksinkertainen TryIt-editori</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f4f4f4;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    header {
+      padding: 0.75rem 1rem;
+      background: #20232a;
+      color: #fff;
+      font-size: 1rem;
+    }
+
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      padding: 0.5rem;
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    button {
+      border: none;
+      padding: 0.4rem 0.8rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+
+    button.run {
+      background: #2e7d32;
+      color: #fff;
+    }
+
+    button.reset {
+      background: #e0e0e0;
+    }
+
+    .panes {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+      min-height: 0;
+    }
+
+    textarea {
+      width: 100%;
+      height: 100%;
+      resize: none;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 0.9rem;
+      padding: 0.5rem;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      background: #fff;
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      background: #fff;
+    }
+
+    .tab-id {
+      font-size: 0.8rem;
+      opacity: 0.7;
+    }
+
+    .status {
+      font-size: 0.8rem;
+      margin-top: 0.25rem;
+    }
+
+    .status-info {
+      color: #555;
+    }
+
+    .status-error {
+      color: #b71c1c;
+    }
+
+    @media (max-width: 800px) {
+      .panes {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    Yksinkertainen TryIt-editori (HTML + CSS + JS)
+  </header>
+
+  <main>
+    <div class="top-bar">
+      <div>
+        Muokkaa alla olevaa HTML:ää ja paina <strong>Aja</strong>.<br>
+        <span class="tab-id" id="tabInfo"></span>
+        <div id="status" class="status status-info"></div>
+      </div>
+      <div class="buttons">
+        <button class="run" onclick="runCode()">Aja ▶</button>
+        <button class="reset" onclick="resetTemplate()">Palauta pohja</button>
+      </div>
+    </div>
+
+    <div class="panes">
+      <textarea id="code"></textarea>
+      <iframe id="preview"></iframe>
+    </div>
+  </main>
+
+  <script>
+    const defaultTemplate = `<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="UTF-8" />
+  <title>Esimerkkisivu</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #fafafa;
+      color: #333;
+      padding: 1rem;
+    }
+    h1 {
+      text-align: center;
+    }
+    .box {
+      padding: 1rem;
+      margin-top: 1rem;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+    }
+  </style>
+</head>
+<body>
+<h1>Hello from the TryIt editor 👋</h1>
+<p>You can add your own HTML, CSS and JS code here.</p>
+
+<div class="box">
+  <button onclick="alert('JavaScript is working!')">Test JS</button>
+</div>
+</body>
+</html>`;
+
+    const codeEl = document.getElementById("code");
+    const previewEl = document.getElementById("preview");
+    const tabInfoEl = document.getElementById("tabInfo");
+    const statusEl = document.getElementById("status");
+
+    const STORAGE_PREFIX = "tryit-code-";
+    let storageDisabled = false;
+
+    const TAB_ID = getOrCreateTabId();
+    const STORAGE_KEY = STORAGE_PREFIX + TAB_ID;
+
+    tabInfoEl.textContent = "Välilehden tunniste: " + TAB_ID;
+
+    function setStatus(message, type = "info") {
+      if (!statusEl) return;
+      statusEl.textContent = message;
+      statusEl.className = "status " + (type === "error" ? "status-error" : "status-info");
+    }
+
+    function disableStorage(reason) {
+      storageDisabled = true;
+      setStatus(reason, "error");
+    }
+
+    function detectStorageAvailability() {
+      try {
+        const testKey = STORAGE_PREFIX + "__test";
+        localStorage.setItem(testKey, "1");
+        localStorage.removeItem(testKey);
+        setStatus("Tallennus käytössä: koodi tallennetaan tämän välilehden localStorageen.");
+        return true;
+      } catch (e) {
+        disableStorage("localStorage ei ole käytettävissä, tallennus poistettu käytöstä (yksityinen tila).");
+        return false;
+      }
+    }
+
+    function getOrCreateTabId() {
+      const url = new URL(window.location.href);
+      let id = url.searchParams.get("tab");
+      if (!id) {
+        id = Math.random().toString(36).slice(2, 10);
+        url.searchParams.set("tab", id);
+        history.replaceState(null, "", url.toString());
+      }
+      return id;
+    }
+
+    function cleanupOldEntries() {
+      if (storageDisabled) return;
+
+      const MAX_ITEMS = 20;
+      const TTL = 1000 * 60 * 60 * 24 * 30; // 30 päivää
+      const now = Date.now();
+      const entries = [];
+
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(STORAGE_PREFIX)) {
+          try {
+            const raw = localStorage.getItem(key);
+            const obj = JSON.parse(raw);
+            if (!obj.updatedAt || now - obj.updatedAt > TTL) {
+              localStorage.removeItem(key);
+            } else {
+              entries.push({ key, updatedAt: obj.updatedAt });
+            }
+          } catch (e) {
+            localStorage.removeItem(key);
+          }
+        }
+      }
+
+      entries.sort((a, b) => b.updatedAt - a.updatedAt); // uusin ensin
+      if (entries.length > MAX_ITEMS) {
+        for (let i = MAX_ITEMS; i < entries.length; i++) {
+          localStorage.removeItem(entries[i].key);
+        }
+      }
+    }
+
+    function saveToStorage() {
+      if (storageDisabled) return;
+
+      const payload = {
+        code: codeEl.value,
+        updatedAt: Date.now()
+      };
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+        cleanupOldEntries();
+      } catch (e) {
+        // Kvota täynnä tai storage muuten estynyt → siirry pysyvään yksityiseen tilaan
+        disableStorage("Tallennus epäonnistui: localStorage täynnä tai estetty. Siirrytty yksityiseen tilaan, koodia ei enää tallenneta selaimeen.");
+      }
+    }
+
+    function loadFromStorage() {
+      if (storageDisabled) return null;
+
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      try {
+        const obj = JSON.parse(raw);
+        return obj.code || null;
+      } catch (e) {
+        localStorage.removeItem(STORAGE_KEY);
+        return null;
+      }
+    }
+
+    function runCode() {
+      const code = codeEl.value;
+      previewEl.srcdoc = code;
+      saveToStorage();
+    }
+
+    function resetTemplate() {
+      codeEl.value = defaultTemplate;
+      runCode();
+    }
+
+    function init() {
+      const storageOk = detectStorageAvailability();
+
+      if (storageOk) {
+        cleanupOldEntries();
+        const saved = loadFromStorage();
+        if (saved) {
+          codeEl.value = saved;
+          runCode();
+          return;
+        }
+      }
+
+      // joko storage ei ole käytössä tai mitään ei ollut tallessa
+      codeEl.value = defaultTemplate;
+      previewEl.srcdoc = codeEl.value; // yksityinen tila: ei tallennusta
+    }
+
+    window.addEventListener("load", init);
+  </script>
+</body>
+</html>
