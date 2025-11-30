@@ -38,11 +38,42 @@ body {
   height: 100vh;
 }
 
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
 header {
-  padding: 0.75rem 1rem;
+  padding: 0.5rem 0.75rem;
   background: var(--header-bg);
   color: var(--header-text);
-  font-size: 1rem;
+  font-size: 0.9rem;
+}
+
+.header-left {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.app-title {
+  font-weight: 600;
+}
+
+.header-text {
+  opacity: 0.9;
+}
+
+.header-separator {
+  opacity: 0.6;
+}
+
+.status-inline {
+  font-size: 0.8rem;
+  opacity: 0.8;
 }
 
 main {
@@ -109,9 +140,22 @@ button.reset {
 .panes {
   flex: 1;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(150px, 1fr) auto minmax(150px, 1fr);
   gap: 0.5rem;
   min-height: 0;
+  align-items: stretch;
+}
+
+.splitter {
+  width: 5px;
+  cursor: col-resize;
+  background: linear-gradient(to right, transparent, var(--border), transparent);
+  border-radius: 999px;
+}
+
+.splitter:hover,
+.splitter.dragging {
+  background: var(--border);
 }
 
 textarea {
@@ -125,6 +169,28 @@ textarea {
   border: 1px solid var(--border);
   background: var(--panel-bg);
   color: var(--text);
+}
+
+/* CodeMirror editor layout and theming */
+.CodeMirror {
+  height: 100% !important;
+  width: 100%;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--panel-bg);
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.9rem;
+}
+
+.CodeMirror-gutters {
+  background: var(--panel-bg);
+  border-right: 1px solid var(--border);
+}
+
+.CodeMirror-scrollbar-filler,
+.CodeMirror-gutter-filler {
+  background: var(--panel-bg);
 }
 
 iframe {
@@ -156,6 +222,12 @@ iframe {
 @media (max-width: 800px) {
   .panes {
     grid-template-columns: 1fr;
-    grid-template-rows: 1fr 1fr;
+    grid-template-rows: 1fr auto 1fr;
+  }
+
+  .splitter {
+    height: 5px;
+    width: 100%;
+    cursor: row-resize;
   }
 }

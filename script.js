@@ -73,11 +73,13 @@ const TEMPLATES = {
 </html>`
 };
 
-const codeEl = document.getElementById("code");
+const codeTextareaEl = document.getElementById("code");
 const previewEl = document.getElementById("preview");
 const tabInfoEl = document.getElementById("tabInfo");
 const statusEl = document.getElementById("status");
 const themeSelectEl = document.getElementById("themeSelect");
+const panesEl = document.getElementById("panes");
+const splitterEl = document.getElementById("splitter");
 
 const STORAGE_PREFIX = "tryit-code-";
 let storageDisabled = false;
@@ -86,6 +88,15 @@ const TAB_ID = getOrCreateTabId();
 const STORAGE_KEY = STORAGE_PREFIX + TAB_ID;
 
 let currentTheme = "light";
+
+// CodeMirror instance (created in init)
+let codeMirror = null;
+
+let isDragging = false;
+let startX = 0;
+let startLeftWidth = 0;
+let isVerticalLayout = false;
+let activePointerId = null;
 
 tabInfoEl.textContent = "Tab id: " + TAB_ID;
 
@@ -161,7 +172,7 @@ function saveToStorage() {
   if (storageDisabled) return;
 
   const payload = {
-    code: codeEl.value,
+    code: getEditorValue(),
     theme: currentTheme,
     updatedAt: Date.now()
   };
@@ -200,18 +211,52 @@ function getDefaultTemplate() {
 }
 
 function runCode() {
-  const code = codeEl.value;
+  const code = getEditorValue();
   previewEl.srcdoc = code;
   saveToStorage();
 }
 
 function resetTemplate() {
-  codeEl.value = getDefaultTemplate();
+  setEditorValue(getDefaultTemplate());
   runCode();
+}
+
+function getEditorValue() {
+  if (codeMirror) {
+    return codeMirror.getValue();
+  }
+  return codeTextareaEl ? codeTextareaEl.value : "";
+}
+
+function setEditorValue(value) {
+  if (codeMirror) {
+    codeMirror.setValue(value);
+  } else if (codeTextareaEl) {
+    codeTextareaEl.value = value;
+  }
 }
 
 function init() {
   const storageOk = detectStorageAvailability();
+
+  // Initialize CodeMirror over the textarea if available
+  if (window.CodeMirror && codeTextareaEl) {
+    codeMirror = CodeMirror.fromTextArea(codeTextareaEl, {
+      mode: "htmlmixed",
+      lineNumbers: true,
+      lineWrapping: true,
+      tabSize: 2,
+      indentUnit: 2,
+      indentWithTabs: false,
+    });
+
+    // Ensure editor resizes with the pane
+    setTimeout(() => {
+      if (codeMirror) {
+        codeMirror.refresh();
+      }
+    }, 0);
+  }
 
   if (themeSelectEl) {
     themeSelectEl.addEventListener("change", (event) => {
@@ -219,12 +264,24 @@ function init() {
     });
   }
 
+  if (splitterEl && panesEl) {
+    if (window.PointerEvent) {
+      splitterEl.addEventListener("pointerdown", onSplitterPointerDown);
+    } else {
+      splitterEl.addEventListener("mousedown", onSplitterMouseDown);
+      window.addEventListener("mousemove", onSplitterMouseMove);
+      window.addEventListener("mouseup", onSplitterMouseUp);
+    }
+    window.addEventListener("resize", updateLayoutMode);
+    updateLayoutMode();
+  }
+
   if (storageOk) {
     cleanupOldEntries();
     const saved = loadFromStorage();
     if (saved && saved.code) {
       applyTheme(saved.theme || "light");
-      codeEl.value = saved.code;
+      setEditorValue(saved.code);
       runCode();
       return;
     }
@@ -232,8 +289,95 @@ function init() {
 
   // either storage is not available or nothing was saved
   applyTheme("light");
-  codeEl.value = getDefaultTemplate();
-  previewEl.srcdoc = codeEl.value; // private mode: no saving
+  setEditorValue(getDefaultTemplate());
+  previewEl.srcdoc = getEditorValue(); // private mode: no saving
+}
+
+function updateLayoutMode() {
+  isVerticalLayout = window.innerWidth <= 800;
+}
+
+function onSplitterMouseDown(event) {
+  event.preventDefault();
+  isDragging = true;
+  splitterEl.classList.add("dragging");
+
+  if (!isVerticalLayout) {
+    startX = event.clientX;
+    const rect = panesEl.getBoundingClientRect();
+    const leftRect = (codeMirror ? codeMirror.getWrapperElement() : codeTextareaEl).getBoundingClientRect();
+    startLeftWidth = leftRect.width / rect.width;
+  }
+}
+
+function onSplitterMouseMove(event) {
+  if (!isDragging) return;
+
+  const rect = panesEl.getBoundingClientRect();
+
+  if (!isVerticalLayout) {
+    const dx = event.clientX - startX;
+    let newLeftWidth = startLeftWidth + dx / rect.width;
+    const minFraction = 150 / rect.width;
+    const maxFraction = 1 - minFraction;
+    if (newLeftWidth < minFraction) newLeftWidth = minFraction;
+    if (newLeftWidth > maxFraction) newLeftWidth = maxFraction;
+    const rightWidth = 1 - newLeftWidth;
+    panesEl.style.gridTemplateColumns = `${newLeftWidth * 100}% auto ${rightWidth * 100}%`;
+  }
+}
+
+function onSplitterMouseUp() {
+  if (!isDragging) return;
+  isDragging = false;
+  splitterEl.classList.remove("dragging");
+}
+
+function onSplitterPointerDown(event) {
+  event.preventDefault();
+  splitterEl.setPointerCapture(event.pointerId);
+  activePointerId = event.pointerId;
+  isDragging = true;
+  splitterEl.classList.add("dragging");
+
+  if (!isVerticalLayout) {
+    startX = event.clientX;
+    const rect = panesEl.getBoundingClientRect();
+    const leftRect = (codeMirror ? codeMirror.getWrapperElement() : codeTextareaEl).getBoundingClientRect();
+    startLeftWidth = leftRect.width / rect.width;
+  }
+
+  splitterEl.addEventListener("pointermove", onSplitterPointerMove);
+  splitterEl.addEventListener("pointerup", onSplitterPointerUpOrCancel);
+  splitterEl.addEventListener("pointercancel", onSplitterPointerUpOrCancel);
+}
+
+function onSplitterPointerMove(event) {
+  if (!isDragging || event.pointerId !== activePointerId) return;
+
+  const rect = panesEl.getBoundingClientRect();
+
+  if (!isVerticalLayout) {
+    const dx = event.clientX - startX;
+    let newLeftWidth = startLeftWidth + dx / rect.width;
+    const minFraction = 150 / rect.width;
+    const maxFraction = 1 - minFraction;
+    if (newLeftWidth < minFraction) newLeftWidth = minFraction;
+    if (newLeftWidth > maxFraction) newLeftWidth = maxFraction;
+    const rightWidth = 1 - newLeftWidth;
+    panesEl.style.gridTemplateColumns = `${newLeftWidth * 100}% auto ${rightWidth * 100}%`;
+  }
+}
+
+function onSplitterPointerUpOrCancel(event) {
+  if (event.pointerId !== activePointerId) return;
+  isDragging = false;
+  activePointerId = null;
+  splitterEl.classList.remove("dragging");
+  splitterEl.releasePointerCapture(event.pointerId);
+  splitterEl.removeEventListener("pointermove", onSplitterPointerMove);
+  splitterEl.removeEventListener("pointerup", onSplitterPointerUpOrCancel);
+  splitterEl.removeEventListener("pointercancel", onSplitterPointerUpOrCancel);
 }
 
 // TODO: add syntax highlighting and indentation assistance for HTML elements in a later iteration.
