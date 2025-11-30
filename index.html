@@ -287,8 +287,11 @@
   const TAB_ID = getOrCreateTabId();
   const STORAGE_KEY = STORAGE_PREFIX + TAB_ID;
 
-  let currentThemeMode = "system"; // "system" | "light" | "dark"
-  let currentResolvedTheme = "light"; // actual light/dark applied
+  // themeMode: "system" | "light" | "dark"
+  let currentThemeMode = "system";
+  // resolved theme: "light" | "dark"
+  let currentTheme = "light";
+  let systemMediaQuery = null;
 
   tabInfoEl.textContent = "Tab id: " + TAB_ID;
 
@@ -390,34 +393,35 @@
     }
   }
 
-  function resolveSystemTheme() {
+  function detectSystemTheme() {
     if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
       return "dark";
     }
     return "light";
   }
 
-  function applyTheme(mode) {
-    currentThemeMode = mode || "system";
-    if (currentThemeMode === "system") {
-      currentResolvedTheme = resolveSystemTheme();
-    } else {
-      currentResolvedTheme = currentThemeMode;
-    }
-    document.body.setAttribute("data-theme", currentResolvedTheme);
+  function applyThemeFromMode() {
+    const resolved = currentThemeMode === "system" ? detectSystemTheme() : currentThemeMode;
+    currentTheme = resolved;
+    document.body.setAttribute("data-theme", resolved);
+
     if (themeSelectEl && themeSelectEl.value !== currentThemeMode) {
       themeSelectEl.value = currentThemeMode;
     }
   }
 
-  function handleSystemThemeChange() {
-    if (currentThemeMode === "system") {
-      applyTheme("system");
-    }
+  function watchSystemTheme() {
+    if (!window.matchMedia) return;
+    systemMediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    systemMediaQuery.addEventListener("change", () => {
+      if (currentThemeMode === "system") {
+        applyThemeFromMode();
+      }
+    });
   }
 
   function getDefaultTemplate() {
-    return TEMPLATES[currentResolvedTheme] || TEMPLATES.light;
+    return TEMPLATES[currentTheme] || TEMPLATES.light;
   }
 
   function runCode() {
@@ -436,24 +440,20 @@
 
     if (themeSelectEl) {
       themeSelectEl.addEventListener("change", (event) => {
-        applyTheme(event.target.value);
+        currentThemeMode = event.target.value || "system";
+        applyThemeFromMode();
+        saveToStorage();
       });
     }
 
-    if (window.matchMedia) {
-      const mq = window.matchMedia("(prefers-color-scheme: dark)");
-      if (mq.addEventListener) {
-        mq.addEventListener("change", handleSystemThemeChange);
-      } else if (mq.addListener) {
-        mq.addListener(handleSystemThemeChange);
-      }
-    }
+    watchSystemTheme();
 
     if (storageOk) {
       cleanupOldEntries();
       const saved = loadFromStorage();
       if (saved && saved.code) {
-        applyTheme(saved.themeMode || "system");
+        currentThemeMode = saved.themeMode || "system";
+        applyThemeFromMode();
         codeEl.value = saved.code;
         runCode();
         return;
@@ -461,9 +461,10 @@
     }
 
     // either storage is not available or nothing was saved
-    applyTheme("system");
+    currentThemeMode = "system";
+    applyThemeFromMode();
     codeEl.value = getDefaultTemplate();
-    previewEl.srcdoc = codeEl.value; // private mode or first load
+    previewEl.srcdoc = codeEl.value; // private mode: no saving
   }
 
   // TODO: add syntax highlighting and indentation assistance for HTML elements in a later iteration.
