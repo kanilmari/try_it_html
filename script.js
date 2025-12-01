@@ -231,11 +231,24 @@ function resetTemplate() {
 }
 
 function wrapPreviewHtml(html, useDark) {
-  if (!useDark) return html;
+  // Always inject explicit styles to ensure proper reset when toggling themes
+  // This fixes the issue where dark styles could persist after unchecking dark mode
+  const lightStyle = `
+<style data-tryit-theme="light">
+  html, body {
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+  a { color: #2563eb !important; }
+  button, input, textarea, select {
+    background: #ffffff !important;
+    color: #111827 !important;
+    border-color: #d1d5db !important;
+  }
+</style>`;
 
-  // Naive wrapper: injects a dark-mode helper style that targets body/html
   const darkStyle = `
-<style>
+<style data-tryit-theme="dark">
   html, body {
     background: #020617 !important;
     color: #e5e7eb !important;
@@ -248,11 +261,13 @@ function wrapPreviewHtml(html, useDark) {
   }
 </style>`;
 
+  const themeStyle = useDark ? darkStyle : lightStyle;
+
   // If the user already has a <head>, inject into it; otherwise prepend
   if (html.includes("<head")) {
-    return html.replace(/<head([^>]*)>/i, (m) => m + darkStyle);
+    return html.replace(/<head([^>]*)>/i, (m) => m + themeStyle);
   }
-  return darkStyle + html;
+  return themeStyle + html;
 }
 
 function getEditorValue() {
