@@ -13,6 +13,16 @@
   --button-run-text: #ffffff;
   --button-reset-bg: #e0e0e0;
   --button-reset-text: #111827;
+  
+  /* Layout dimensions */
+  --header-padding-y: 0.5rem;
+  --header-font-size: 0.9rem;
+  --header-line-height: 1.4;
+  --main-padding: 0.5rem;
+  /* Header height = padding-top + padding-bottom + (font-size * line-height) */
+  --header-height: calc(var(--header-padding-y) * 2 + var(--header-font-size) * var(--header-line-height));
+  /* Pane height = viewport - header - main padding (top + bottom) */
+  --pane-height: calc(100vh - var(--header-height) - var(--main-padding) * 4);
 }
 
 body[data-theme="dark"] {
@@ -46,10 +56,11 @@ body {
 }
 
 header {
-  padding: 0.5rem 0.75rem;
+  padding: var(--header-padding-y) 0.75rem;
   background: var(--header-bg);
   color: var(--header-text);
-  font-size: 0.9rem;
+  font-size: var(--header-font-size);
+  line-height: var(--header-line-height);
 }
 
 .header-left {
@@ -81,7 +92,7 @@ main {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  padding: 0.5rem;
+  padding: var(--main-padding);
 }
 
 .top-bar {
@@ -138,16 +149,15 @@ button.reset {
 }
 
 .panes {
-  flex: 1;
   display: grid;
   grid-template-columns: minmax(150px, 1fr) auto minmax(150px, 1fr);
   gap: 0.5rem;
-  min-height: 0;
-  align-items: stretch;
+  align-items: start;
 }
 
 .splitter {
   width: 5px;
+  height: var(--pane-height);
   cursor: col-resize;
   background: linear-gradient(to right, transparent, var(--border), transparent);
   border-radius: 999px;
@@ -173,7 +183,7 @@ textarea {
 
 /* CodeMirror editor layout and theming */
 .CodeMirror {
-  height: 100% !important;
+  height: var(--pane-height) !important;
   width: 100%;
   border-radius: 4px;
   border: 1px solid var(--border);
@@ -181,6 +191,11 @@ textarea {
   color: var(--text);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   font-size: 0.9rem;
+}
+
+.CodeMirror-scroll {
+  overflow-y: auto !important;
+  overflow-x: auto !important;
 }
 
 .CodeMirror-gutters {
@@ -195,10 +210,11 @@ textarea {
 
 iframe {
   width: 100%;
-  height: 100%;
+  height: var(--pane-height);
   border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--panel-bg);
+  overflow: auto;
 }
 
 .tab-id {
