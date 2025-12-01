@@ -96,7 +96,9 @@ let codeMirror = null;
 
 let isDragging = false;
 let startX = 0;
+let startY = 0;
 let startLeftWidth = 0;
+let startTopHeight = 0;
 let isVerticalLayout = false;
 let activePointerId = null;
 
@@ -357,7 +359,14 @@ function init() {
 }
 
 function updateLayoutMode() {
+  const wasVertical = isVerticalLayout;
   isVerticalLayout = window.innerWidth <= 800;
+  
+  // Reset custom grid styles when switching layout mode
+  if (wasVertical !== isVerticalLayout && panesEl) {
+    panesEl.style.gridTemplateColumns = "";
+    panesEl.style.gridTemplateRows = "";
+  }
 }
 
 function onSplitterMouseDown(event) {
@@ -365,9 +374,14 @@ function onSplitterMouseDown(event) {
   isDragging = true;
   splitterEl.classList.add("dragging");
 
-  if (!isVerticalLayout) {
+  const rect = panesEl.getBoundingClientRect();
+  if (isVerticalLayout) {
+    startY = event.clientY;
+    const topEl = codeMirror ? codeMirror.getWrapperElement() : codeTextareaEl;
+    const topRect = topEl.getBoundingClientRect();
+    startTopHeight = topRect.height / rect.height;
+  } else {
     startX = event.clientX;
-    const rect = panesEl.getBoundingClientRect();
     const leftRect = (codeMirror ? codeMirror.getWrapperElement() : codeTextareaEl).getBoundingClientRect();
     startLeftWidth = leftRect.width / rect.width;
   }
@@ -378,7 +392,17 @@ function onSplitterMouseMove(event) {
 
   const rect = panesEl.getBoundingClientRect();
 
-  if (!isVerticalLayout) {
+  if (isVerticalLayout) {
+    const dy = event.clientY - startY;
+    let newTopHeight = startTopHeight + dy / rect.height;
+    const minFraction = 100 / rect.height;
+    const maxFraction = 1 - minFraction;
+    if (newTopHeight < minFraction) newTopHeight = minFraction;
+    if (newTopHeight > maxFraction) newTopHeight = maxFraction;
+    const bottomHeight = 1 - newTopHeight;
+    panesEl.style.gridTemplateRows = `${newTopHeight * 100}% auto ${bottomHeight * 100}%`;
+    panesEl.style.gridTemplateColumns = "1fr";
+  } else {
     const dx = event.clientX - startX;
     let newLeftWidth = startLeftWidth + dx / rect.width;
     const minFraction = 150 / rect.width;
@@ -387,6 +411,7 @@ function onSplitterMouseMove(event) {
     if (newLeftWidth > maxFraction) newLeftWidth = maxFraction;
     const rightWidth = 1 - newLeftWidth;
     panesEl.style.gridTemplateColumns = `${newLeftWidth * 100}% auto ${rightWidth * 100}%`;
+    panesEl.style.gridTemplateRows = "";
   }
 }
 
@@ -403,9 +428,14 @@ function onSplitterPointerDown(event) {
   isDragging = true;
   splitterEl.classList.add("dragging");
 
-  if (!isVerticalLayout) {
+  const rect = panesEl.getBoundingClientRect();
+  if (isVerticalLayout) {
+    startY = event.clientY;
+    const topEl = codeMirror ? codeMirror.getWrapperElement() : codeTextareaEl;
+    const topRect = topEl.getBoundingClientRect();
+    startTopHeight = topRect.height / rect.height;
+  } else {
     startX = event.clientX;
-    const rect = panesEl.getBoundingClientRect();
     const leftRect = (codeMirror ? codeMirror.getWrapperElement() : codeTextareaEl).getBoundingClientRect();
     startLeftWidth = leftRect.width / rect.width;
   }
@@ -420,7 +450,17 @@ function onSplitterPointerMove(event) {
 
   const rect = panesEl.getBoundingClientRect();
 
-  if (!isVerticalLayout) {
+  if (isVerticalLayout) {
+    const dy = event.clientY - startY;
+    let newTopHeight = startTopHeight + dy / rect.height;
+    const minFraction = 100 / rect.height;
+    const maxFraction = 1 - minFraction;
+    if (newTopHeight < minFraction) newTopHeight = minFraction;
+    if (newTopHeight > maxFraction) newTopHeight = maxFraction;
+    const bottomHeight = 1 - newTopHeight;
+    panesEl.style.gridTemplateRows = `${newTopHeight * 100}% auto ${bottomHeight * 100}%`;
+    panesEl.style.gridTemplateColumns = "1fr";
+  } else {
     const dx = event.clientX - startX;
     let newLeftWidth = startLeftWidth + dx / rect.width;
     const minFraction = 150 / rect.width;
@@ -429,6 +469,7 @@ function onSplitterPointerMove(event) {
     if (newLeftWidth > maxFraction) newLeftWidth = maxFraction;
     const rightWidth = 1 - newLeftWidth;
     panesEl.style.gridTemplateColumns = `${newLeftWidth * 100}% auto ${rightWidth * 100}%`;
+    panesEl.style.gridTemplateRows = "";
   }
 }
 
