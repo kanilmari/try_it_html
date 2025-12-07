@@ -14,19 +14,30 @@
   <script src="vendor/codemirror/javascript.js"></script>
   <script src="vendor/codemirror/css.js"></script>
   <script src="vendor/codemirror/htmlmixed.js"></script>
+  <script src="vendor/vkbeautify.js"></script>
 </head>
 <body data-theme="light">
 <header>
   <div class="header-row">
     <div class="header-left">
-      <span class="app-title">Simple TryIt editor (HTML + CSS + JS)</span>
-      <span class="header-separator">·</span>
-      <span class="header-text">Edit the HTML below and press <strong>Run</strong>.</span>
-      <span class="header-separator">·</span>
-      <span class="tab-id" id="tabInfo"></span>
-      <span class="status-inline" id="status"></span>
+      <div class="tab-buttons" role="tablist" aria-label="Available editors">
+        <button class="tab-button active" id="tab-tryit-button" role="tab" aria-selected="true" aria-controls="tab-tryit" data-tab-target="tryit">
+          Try It
+        </button>
+        <button class="tab-button" id="tab-formatter-button" role="tab" aria-selected="false" aria-controls="tab-formatter" data-tab-target="formatter">
+          HTML formatter
+        </button>
+      </div>
+      <div class="header-details">
+        <span class="app-title" id="tabTitle">Simple TryIt editor (HTML + CSS + JS)</span>
+        <span class="header-separator">·</span>
+        <span class="header-text" id="tabDescription">Edit the HTML below and press <strong>Run</strong>.</span>
+        <span class="header-separator">·</span>
+        <span class="tab-id" id="tabInfo"></span>
+        <span class="status-inline" id="status"></span>
+      </div>
     </div>
-    <div class="buttons">
+    <div class="buttons" id="controlBar">
       <div class="controls">
         <label for="themeSelect">Theme:</label>
         <select id="themeSelect">
@@ -34,25 +45,40 @@
           <option value="dark">Dark</option>
         </select>
       </div>
-      <div class="controls">
+      <div class="controls" id="previewToggleWrapper">
         <label>
           <input type="checkbox" id="previewDarkToggle" />
           Try dark mode in preview
         </label>
       </div>
-      <button class="run" onclick="runCode()">Run ▶</button>
-      <button class="reset" onclick="resetTemplate()">Reset template</button>
+      <div class="tab-buttons-inline" id="tryitControls">
+        <button class="run" id="runTryIt">Run ▶</button>
+        <button class="reset" id="resetTryIt">Reset template</button>
+      </div>
+      <div class="tab-buttons-inline hidden" id="formatterControls">
+        <button class="run" id="formatHtml">Format ▶</button>
+        <button class="reset" id="resetFormatter">Reset example</button>
+      </div>
     </div>
   </div>
 </header>
 
 <main>
+  <section class="tab-panel active" id="tab-tryit" role="tabpanel" aria-labelledby="tab-tryit-button">
+    <div class="panes" id="tryitPanes">
+      <textarea id="code"></textarea>
+      <div class="splitter" id="tryitSplitter" aria-label="Resize panels" role="separator" aria-orientation="vertical"></div>
+      <iframe id="preview"></iframe>
+    </div>
+  </section>
 
-  <div class="panes" id="panes">
-    <textarea id="code"></textarea>
-    <div class="splitter" id="splitter" aria-label="Resize panels" role="separator" aria-orientation="vertical"></div>
-    <iframe id="preview"></iframe>
-  </div>
+  <section class="tab-panel" id="tab-formatter" role="tabpanel" aria-labelledby="tab-formatter-button">
+    <div class="panes" id="formatterPanes">
+      <textarea id="formatterInput"></textarea>
+      <div class="splitter" id="formatterSplitter" aria-label="Resize panels" role="separator" aria-orientation="vertical"></div>
+      <textarea id="formatterOutput"></textarea>
+    </div>
+  </section>
 </main>
 
 <script src="script.js"></script>
