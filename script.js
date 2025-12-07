@@ -1,4 +1,4 @@
-const TRY_IT_TEMPLATES = {
+const TEMPLATES = {
   light: `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -73,163 +73,34 @@ const TRY_IT_TEMPLATES = {
 </html>`
 };
 
-const FORMATTER_DEFAULT = `<div><p><strong>Paste your HTML here</strong></p><p>This formatter uses vkBeautify to tidy up indentation.</p></div>`;
-
-const TAB_COPY = {
-  tryit: {
-    title: "Simple TryIt editor (HTML + CSS + JS)",
-    description: "Edit the HTML below and press <strong>Run</strong>."
-  },
-  formatter: {
-    title: "HTML formatter",
-    description: "Paste HTML on the left and click <strong>Format</strong> to tidy it up."
-  }
-};
-
-const STORAGE_PREFIXES = {
-  tryit: "tryit-code-",
-  formatter: "formatter-code-"
-};
-
 const codeTextareaEl = document.getElementById("code");
 const previewEl = document.getElementById("preview");
-const formatterInputEl = document.getElementById("formatterInput");
-const formatterOutputEl = document.getElementById("formatterOutput");
-
-const tabButtons = document.querySelectorAll("[data-tab-target]");
-const tabPanels = {
-  tryit: document.getElementById("tab-tryit"),
-  formatter: document.getElementById("tab-formatter")
-};
-
 const tabInfoEl = document.getElementById("tabInfo");
 const statusEl = document.getElementById("status");
 const themeSelectEl = document.getElementById("themeSelect");
 const previewDarkToggleEl = document.getElementById("previewDarkToggle");
-const previewToggleWrapperEl = document.getElementById("previewToggleWrapper");
+const panesEl = document.getElementById("panes");
+const splitterEl = document.getElementById("splitter");
 
-const tryitControlsEl = document.getElementById("tryitControls");
-const formatterControlsEl = document.getElementById("formatterControls");
-
-const tabTitleEl = document.getElementById("tabTitle");
-const tabDescriptionEl = document.getElementById("tabDescription");
-
-const runTryItBtn = document.getElementById("runTryIt");
-const resetTryItBtn = document.getElementById("resetTryIt");
-const formatHtmlBtn = document.getElementById("formatHtml");
-const resetFormatterBtn = document.getElementById("resetFormatter");
-
-const tryitPanesEl = document.getElementById("tryitPanes");
-const tryitSplitterEl = document.getElementById("tryitSplitter");
-const formatterPanesEl = document.getElementById("formatterPanes");
-const formatterSplitterEl = document.getElementById("formatterSplitter");
-
-const STORAGE_PREFIX = STORAGE_PREFIXES.tryit;
-const FORMATTER_STORAGE_PREFIX = STORAGE_PREFIXES.formatter;
-
+const STORAGE_PREFIX = "tryit-code-";
 let storageDisabled = false;
 
 const TAB_ID = getOrCreateTabId();
-const TRY_IT_STORAGE_KEY = STORAGE_PREFIX + TAB_ID;
-const FORMATTER_STORAGE_KEY = FORMATTER_STORAGE_PREFIX + TAB_ID;
+const STORAGE_KEY = STORAGE_PREFIX + TAB_ID;
 
 let currentTheme = "light";
 let previewDarkMode = false;
-let activeTab = "tryit";
 
-let tryItEditor = null;
-let formatterInputEditor = null;
-let formatterOutputEditor = null;
+// CodeMirror instance (created in init)
+let codeMirror = null;
 
-const splitPanes = [];
-
-class SplitPane {
-  constructor(container, splitter, getPrimaryPane) {
-    this.container = container;
-    this.splitter = splitter;
-    this.getPrimaryPane = getPrimaryPane;
-    this.isVertical = window.innerWidth <= 800;
-    this.isDragging = false;
-    this.activePointerId = null;
-    this.startFraction = 0;
-    this.startCoord = 0;
-    this.init();
-  }
-
-  init() {
-    if (!this.container || !this.splitter) return;
-    if (window.PointerEvent) {
-      this.splitter.addEventListener("pointerdown", (event) => this.onPointerDown(event));
-    }
-    window.addEventListener("resize", () => this.updateLayoutMode());
-  }
-
-  updateLayoutMode() {
-    const wasVertical = this.isVertical;
-    this.isVertical = window.innerWidth <= 800;
-    if (wasVertical !== this.isVertical) {
-      this.container.style.gridTemplateColumns = "";
-      this.container.style.gridTemplateRows = "";
-    }
-  }
-
-  onPointerDown(event) {
-    event.preventDefault();
-    this.splitter.setPointerCapture(event.pointerId);
-    this.activePointerId = event.pointerId;
-    this.isDragging = true;
-    this.splitter.classList.add("dragging");
-
-    const rect = this.container.getBoundingClientRect();
-    const primaryRect = this.getPrimaryPane().getBoundingClientRect();
-
-    if (this.isVertical) {
-      this.startCoord = event.clientY;
-      this.startFraction = primaryRect.height / rect.height;
-    } else {
-      this.startCoord = event.clientX;
-      this.startFraction = primaryRect.width / rect.width;
-    }
-
-    this.splitter.addEventListener("pointermove", this.onPointerMove);
-    this.splitter.addEventListener("pointerup", this.onPointerUpOrCancel);
-    this.splitter.addEventListener("pointercancel", this.onPointerUpOrCancel);
-  }
-
-  onPointerMove = (event) => {
-    if (!this.isDragging || event.pointerId !== this.activePointerId) return;
-
-    const rect = this.container.getBoundingClientRect();
-    const delta = this.isVertical ? event.clientY - this.startCoord : event.clientX - this.startCoord;
-    const size = this.isVertical ? rect.height : rect.width;
-
-    let newFraction = this.startFraction + delta / size;
-    const minFraction = (this.isVertical ? 100 : 150) / size;
-    const maxFraction = 1 - minFraction;
-    if (newFraction < minFraction) newFraction = minFraction;
-    if (newFraction > maxFraction) newFraction = maxFraction;
-
-    const otherFraction = 1 - newFraction;
-    if (this.isVertical) {
-      this.container.style.gridTemplateRows = `${newFraction * 100}% auto ${otherFraction * 100}%`;
-      this.container.style.gridTemplateColumns = "1fr";
-    } else {
-      this.container.style.gridTemplateColumns = `${newFraction * 100}% auto ${otherFraction * 100}%`;
-      this.container.style.gridTemplateRows = "";
-    }
-  };
-
-  onPointerUpOrCancel = (event) => {
-    if (event.pointerId !== this.activePointerId) return;
-    this.isDragging = false;
-    this.activePointerId = null;
-    this.splitter.classList.remove("dragging");
-    this.splitter.releasePointerCapture(event.pointerId);
-    this.splitter.removeEventListener("pointermove", this.onPointerMove);
-    this.splitter.removeEventListener("pointerup", this.onPointerUpOrCancel);
-    this.splitter.removeEventListener("pointercancel", this.onPointerUpOrCancel);
-  };
-}
+let isDragging = false;
+let startX = 0;
+let startY = 0;
+let startLeftWidth = 0;
+let startTopHeight = 0;
+let isVerticalLayout = false;
+let activePointerId = null;
 
 tabInfoEl.textContent = "Tab id: " + TAB_ID;
 
@@ -275,11 +146,10 @@ function cleanupOldEntries() {
   const TTL = 1000 * 60 * 60 * 24 * 30; // 30 days
   const now = Date.now();
   const entries = [];
-  const prefixes = Object.values(STORAGE_PREFIXES);
 
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key && prefixes.some((prefix) => key.startsWith(prefix))) {
+    if (key && key.startsWith(STORAGE_PREFIX)) {
       try {
         const raw = localStorage.getItem(key);
         const obj = JSON.parse(raw);
@@ -302,51 +172,32 @@ function cleanupOldEntries() {
   }
 }
 
-function saveTryItToStorage() {
+function saveToStorage() {
   if (storageDisabled) return;
 
   const payload = {
-    code: getTryItValue(),
+    code: getEditorValue(),
     theme: currentTheme,
     updatedAt: Date.now()
   };
   try {
-    localStorage.setItem(TRY_IT_STORAGE_KEY, JSON.stringify(payload));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     cleanupOldEntries();
   } catch (e) {
-    disableStorage(
-      "Saving failed: localStorage is full or blocked. Switched to private mode, code will no longer be saved in the browser."
-    );
+    // Quota full or storage otherwise blocked → switch to permanent private mode
+    disableStorage("Saving failed: localStorage is full or blocked. Switched to private mode, code will no longer be saved in the browser.");
   }
 }
 
-function saveFormatterToStorage() {
-  if (storageDisabled) return;
-
-  const payload = {
-    code: getFormatterInput(),
-    updatedAt: Date.now(),
-    theme: currentTheme
-  };
-  try {
-    localStorage.setItem(FORMATTER_STORAGE_KEY, JSON.stringify(payload));
-    cleanupOldEntries();
-  } catch (e) {
-    disableStorage(
-      "Saving failed: localStorage is full or blocked. Switched to private mode, code will no longer be saved in the browser."
-    );
-  }
-}
-
-function loadFromStorage(key) {
+function loadFromStorage() {
   if (storageDisabled) return null;
 
-  const raw = localStorage.getItem(key);
+  const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return null;
   try {
     return JSON.parse(raw);
   } catch (e) {
-    localStorage.removeItem(key);
+    localStorage.removeItem(STORAGE_KEY);
     return null;
   }
 }
@@ -358,19 +209,32 @@ function applyTheme(theme) {
     themeSelectEl.value = currentTheme;
   }
 
-  const cmTheme = currentTheme === "dark" ? "dracula" : "default";
-  [tryItEditor, formatterInputEditor, formatterOutputEditor].forEach((editor) => {
-    if (editor) {
-      editor.setOption("theme", cmTheme);
-    }
-  });
+  // Sync CodeMirror theme with app theme
+  if (codeMirror) {
+    const cmTheme = currentTheme === "dark" ? "dracula" : "default";
+    codeMirror.setOption("theme", cmTheme);
+  }
 }
 
 function getDefaultTemplate() {
-  return TRY_IT_TEMPLATES[currentTheme] || TRY_IT_TEMPLATES.light;
+  return TEMPLATES[currentTheme] || TEMPLATES.light;
+}
+
+function runCode() {
+  const code = getEditorValue();
+  const wrapped = wrapPreviewHtml(code, previewDarkMode);
+  previewEl.srcdoc = wrapped;
+  saveToStorage();
+}
+
+function resetTemplate() {
+  setEditorValue(getDefaultTemplate());
+  runCode();
 }
 
 function wrapPreviewHtml(html, useDark) {
+  // Always inject explicit styles to ensure proper reset when toggling themes
+  // This fixes the issue where dark styles could persist after unchecking dark mode
   const lightStyle = `
 <style data-tryit-theme="light">
   html, body {
@@ -401,224 +265,57 @@ function wrapPreviewHtml(html, useDark) {
 
   const themeStyle = useDark ? darkStyle : lightStyle;
 
+  // If the user already has a <head>, inject into it; otherwise prepend
   if (html.includes("<head")) {
     return html.replace(/<head([^>]*)>/i, (m) => m + themeStyle);
   }
   return themeStyle + html;
 }
 
-function runTryIt() {
-  const code = getTryItValue();
-  const wrapped = wrapPreviewHtml(code, previewDarkMode);
-  previewEl.srcdoc = wrapped;
-  saveTryItToStorage();
-}
-
-function resetTryIt() {
-  setTryItValue(getDefaultTemplate());
-  runTryIt();
-}
-
-function formatHtml() {
-  if (!window.vkbeautify || typeof window.vkbeautify.html !== "function") {
-    setStatus("Formatter library missing", "error");
-    return;
-  }
-
-  const raw = getFormatterInput();
-  try {
-    const formatted = window.vkbeautify.html(raw, "  ");
-    setFormatterOutput(formatted);
-    saveFormatterToStorage();
-  } catch (e) {
-    setStatus("Formatting failed: " + e.message, "error");
-  }
-}
-
-function resetFormatter() {
-  setFormatterInput(FORMATTER_DEFAULT);
-  setFormatterOutput("");
-  formatHtml();
-}
-
-function getTryItValue() {
-  if (tryItEditor) {
-    return tryItEditor.getValue();
+function getEditorValue() {
+  if (codeMirror) {
+    return codeMirror.getValue();
   }
   return codeTextareaEl ? codeTextareaEl.value : "";
 }
 
-function setTryItValue(value) {
-  if (tryItEditor) {
-    tryItEditor.setValue(value);
+function setEditorValue(value) {
+  if (codeMirror) {
+    codeMirror.setValue(value);
   } else if (codeTextareaEl) {
     codeTextareaEl.value = value;
   }
 }
 
-function getFormatterInput() {
-  if (formatterInputEditor) {
-    return formatterInputEditor.getValue();
-  }
-  return formatterInputEl ? formatterInputEl.value : "";
-}
-
-function setFormatterInput(value) {
-  if (formatterInputEditor) {
-    formatterInputEditor.setValue(value);
-  } else if (formatterInputEl) {
-    formatterInputEl.value = value;
-  }
-}
-
-function setFormatterOutput(value) {
-  if (formatterOutputEditor) {
-    formatterOutputEditor.setValue(value);
-  } else if (formatterOutputEl) {
-    formatterOutputEl.value = value;
-  }
-}
-
-function initEditors() {
-  if (window.CodeMirror && codeTextareaEl) {
-    tryItEditor = CodeMirror.fromTextArea(codeTextareaEl, {
-      mode: "htmlmixed",
-      lineNumbers: true,
-      lineWrapping: true,
-      tabSize: 2,
-      indentUnit: 2,
-      indentWithTabs: false
-    });
-  }
-
-  if (window.CodeMirror && formatterInputEl) {
-    formatterInputEditor = CodeMirror.fromTextArea(formatterInputEl, {
-      mode: "htmlmixed",
-      lineNumbers: true,
-      lineWrapping: true,
-      tabSize: 2,
-      indentUnit: 2,
-      indentWithTabs: false
-    });
-  }
-
-  if (window.CodeMirror && formatterOutputEl) {
-    formatterOutputEditor = CodeMirror.fromTextArea(formatterOutputEl, {
-      mode: "htmlmixed",
-      lineNumbers: true,
-      lineWrapping: true,
-      readOnly: true
-    });
-  }
-
-  setTimeout(() => {
-    [tryItEditor, formatterInputEditor, formatterOutputEditor].forEach((editor) => {
-      if (editor) {
-        editor.refresh();
-      }
-    });
-  }, 0);
-}
-
-function initStorageAndDefaults(storageOk) {
-  if (storageOk) {
-    cleanupOldEntries();
-    const savedTryIt = loadFromStorage(TRY_IT_STORAGE_KEY);
-    const savedFormatter = loadFromStorage(FORMATTER_STORAGE_KEY);
-
-    if (savedTryIt && savedTryIt.code) {
-      applyTheme(savedTryIt.theme || "light");
-      setTryItValue(savedTryIt.code);
-      runTryIt();
-    } else {
-      applyTheme("light");
-      setTryItValue(getDefaultTemplate());
-      previewEl.srcdoc = wrapPreviewHtml(getTryItValue(), previewDarkMode);
-    }
-
-    if (savedFormatter && savedFormatter.code) {
-      setFormatterInput(savedFormatter.code);
-      setFormatterOutput("");
-    } else {
-      setFormatterInput(FORMATTER_DEFAULT);
-      setFormatterOutput("");
-    }
-  } else {
-    applyTheme("light");
-    setTryItValue(getDefaultTemplate());
-    previewEl.srcdoc = wrapPreviewHtml(getTryItValue(), previewDarkMode);
-    setFormatterInput(FORMATTER_DEFAULT);
-    setFormatterOutput("");
-  }
-
-  formatHtml();
-}
-
-function switchTab(tab) {
-  if (!TAB_COPY[tab]) return;
-  activeTab = tab;
-
-  tabButtons.forEach((button) => {
-    const target = button.getAttribute("data-tab-target");
-    const isActive = target === tab;
-    button.classList.toggle("active", isActive);
-    button.setAttribute("aria-selected", isActive ? "true" : "false");
-  });
-
-  Object.entries(tabPanels).forEach(([key, panel]) => {
-    panel.classList.toggle("active", key === tab);
-  });
-
-  if (tabTitleEl) tabTitleEl.textContent = TAB_COPY[tab].title;
-  if (tabDescriptionEl) tabDescriptionEl.innerHTML = TAB_COPY[tab].description;
-
-  if (previewToggleWrapperEl) {
-    previewToggleWrapperEl.classList.toggle("hidden", tab !== "tryit");
-  }
-
-  if (tryitControlsEl) tryitControlsEl.classList.toggle("hidden", tab !== "tryit");
-  if (formatterControlsEl) formatterControlsEl.classList.toggle("hidden", tab !== "formatter");
-
-  setTimeout(() => {
-    [tryItEditor, formatterInputEditor, formatterOutputEditor].forEach((editor) => editor && editor.refresh());
-    splitPanes.forEach((pane) => pane.updateLayoutMode());
-  }, 0);
-}
-
-function initTabs() {
-  tabButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      const target = button.getAttribute("data-tab-target");
-      switchTab(target);
-    });
-  });
-}
-
-function initSplitters() {
-  const tryItPane = new SplitPane(tryitPanesEl, tryitSplitterEl, () => {
-    if (tryItEditor) return tryItEditor.getWrapperElement();
-    return codeTextareaEl;
-  });
-
-  const formatterPane = new SplitPane(formatterPanesEl, formatterSplitterEl, () => {
-    if (formatterInputEditor) return formatterInputEditor.getWrapperElement();
-    return formatterInputEl;
-  });
-
-  splitPanes.push(tryItPane, formatterPane);
-}
-
 function init() {
   const storageOk = detectStorageAvailability();
-  initTabs();
-  initEditors();
-  applyTheme(currentTheme);
+
+  // Initialize CodeMirror over the textarea if available
+  if (window.CodeMirror && codeTextareaEl) {
+    codeMirror = CodeMirror.fromTextArea(codeTextareaEl, {
+      mode: "htmlmixed",
+      lineNumbers: true,
+      lineWrapping: true,
+      tabSize: 2,
+      indentUnit: 2,
+      indentWithTabs: false,
+    });
+
+    // Apply initial theme based on currentTheme
+    const cmInitialTheme = currentTheme === "dark" ? "dracula" : "default";
+    codeMirror.setOption("theme", cmInitialTheme);
+
+    // Ensure editor resizes with the pane
+    setTimeout(() => {
+      if (codeMirror) {
+        codeMirror.refresh();
+      }
+    }, 0);
+  }
 
   if (themeSelectEl) {
     themeSelectEl.addEventListener("change", (event) => {
       applyTheme(event.target.value);
-      saveTryItToStorage();
-      saveFormatterToStorage();
     });
   }
 
@@ -626,19 +323,167 @@ function init() {
     previewDarkMode = previewDarkToggleEl.checked;
     previewDarkToggleEl.addEventListener("change", () => {
       previewDarkMode = previewDarkToggleEl.checked;
-      runTryIt();
+      // Re-run current code to apply or remove dark wrapper
+      runCode();
     });
   }
 
-  initSplitters();
-  initStorageAndDefaults(storageOk);
+  if (splitterEl && panesEl) {
+    if (window.PointerEvent) {
+      splitterEl.addEventListener("pointerdown", onSplitterPointerDown);
+    } else {
+      splitterEl.addEventListener("mousedown", onSplitterMouseDown);
+      window.addEventListener("mousemove", onSplitterMouseMove);
+      window.addEventListener("mouseup", onSplitterMouseUp);
+    }
+    window.addEventListener("resize", updateLayoutMode);
+    updateLayoutMode();
+  }
 
-  if (runTryItBtn) runTryItBtn.addEventListener("click", runTryIt);
-  if (resetTryItBtn) resetTryItBtn.addEventListener("click", resetTryIt);
-  if (formatHtmlBtn) formatHtmlBtn.addEventListener("click", formatHtml);
-  if (resetFormatterBtn) resetFormatterBtn.addEventListener("click", resetFormatter);
+  if (storageOk) {
+    cleanupOldEntries();
+    const saved = loadFromStorage();
+    if (saved && saved.code) {
+      applyTheme(saved.theme || "light");
+      setEditorValue(saved.code);
+      runCode();
+      return;
+    }
+  }
 
-  switchTab("tryit");
+  // either storage is not available or nothing was saved
+  applyTheme("light");
+  setEditorValue(getDefaultTemplate());
+  const wrappedInitial = wrapPreviewHtml(getEditorValue(), previewDarkMode);
+  previewEl.srcdoc = wrappedInitial; // private mode: no saving
 }
+
+function updateLayoutMode() {
+  const wasVertical = isVerticalLayout;
+  isVerticalLayout = window.innerWidth <= 800;
+  
+  // Reset custom grid styles when switching layout mode
+  if (wasVertical !== isVerticalLayout && panesEl) {
+    panesEl.style.gridTemplateColumns = "";
+    panesEl.style.gridTemplateRows = "";
+  }
+}
+
+function onSplitterMouseDown(event) {
+  event.preventDefault();
+  isDragging = true;
+  splitterEl.classList.add("dragging");
+
+  const rect = panesEl.getBoundingClientRect();
+  if (isVerticalLayout) {
+    startY = event.clientY;
+    const topEl = codeMirror ? codeMirror.getWrapperElement() : codeTextareaEl;
+    const topRect = topEl.getBoundingClientRect();
+    startTopHeight = topRect.height / rect.height;
+  } else {
+    startX = event.clientX;
+    const leftRect = (codeMirror ? codeMirror.getWrapperElement() : codeTextareaEl).getBoundingClientRect();
+    startLeftWidth = leftRect.width / rect.width;
+  }
+}
+
+function onSplitterMouseMove(event) {
+  if (!isDragging) return;
+
+  const rect = panesEl.getBoundingClientRect();
+
+  if (isVerticalLayout) {
+    const dy = event.clientY - startY;
+    let newTopHeight = startTopHeight + dy / rect.height;
+    const minFraction = 100 / rect.height;
+    const maxFraction = 1 - minFraction;
+    if (newTopHeight < minFraction) newTopHeight = minFraction;
+    if (newTopHeight > maxFraction) newTopHeight = maxFraction;
+    const bottomHeight = 1 - newTopHeight;
+    panesEl.style.gridTemplateRows = `${newTopHeight * 100}% auto ${bottomHeight * 100}%`;
+    panesEl.style.gridTemplateColumns = "1fr";
+  } else {
+    const dx = event.clientX - startX;
+    let newLeftWidth = startLeftWidth + dx / rect.width;
+    const minFraction = 150 / rect.width;
+    const maxFraction = 1 - minFraction;
+    if (newLeftWidth < minFraction) newLeftWidth = minFraction;
+    if (newLeftWidth > maxFraction) newLeftWidth = maxFraction;
+    const rightWidth = 1 - newLeftWidth;
+    panesEl.style.gridTemplateColumns = `${newLeftWidth * 100}% auto ${rightWidth * 100}%`;
+    panesEl.style.gridTemplateRows = "";
+  }
+}
+
+function onSplitterMouseUp() {
+  if (!isDragging) return;
+  isDragging = false;
+  splitterEl.classList.remove("dragging");
+}
+
+function onSplitterPointerDown(event) {
+  event.preventDefault();
+  splitterEl.setPointerCapture(event.pointerId);
+  activePointerId = event.pointerId;
+  isDragging = true;
+  splitterEl.classList.add("dragging");
+
+  const rect = panesEl.getBoundingClientRect();
+  if (isVerticalLayout) {
+    startY = event.clientY;
+    const topEl = codeMirror ? codeMirror.getWrapperElement() : codeTextareaEl;
+    const topRect = topEl.getBoundingClientRect();
+    startTopHeight = topRect.height / rect.height;
+  } else {
+    startX = event.clientX;
+    const leftRect = (codeMirror ? codeMirror.getWrapperElement() : codeTextareaEl).getBoundingClientRect();
+    startLeftWidth = leftRect.width / rect.width;
+  }
+
+  splitterEl.addEventListener("pointermove", onSplitterPointerMove);
+  splitterEl.addEventListener("pointerup", onSplitterPointerUpOrCancel);
+  splitterEl.addEventListener("pointercancel", onSplitterPointerUpOrCancel);
+}
+
+function onSplitterPointerMove(event) {
+  if (!isDragging || event.pointerId !== activePointerId) return;
+
+  const rect = panesEl.getBoundingClientRect();
+
+  if (isVerticalLayout) {
+    const dy = event.clientY - startY;
+    let newTopHeight = startTopHeight + dy / rect.height;
+    const minFraction = 100 / rect.height;
+    const maxFraction = 1 - minFraction;
+    if (newTopHeight < minFraction) newTopHeight = minFraction;
+    if (newTopHeight > maxFraction) newTopHeight = maxFraction;
+    const bottomHeight = 1 - newTopHeight;
+    panesEl.style.gridTemplateRows = `${newTopHeight * 100}% auto ${bottomHeight * 100}%`;
+    panesEl.style.gridTemplateColumns = "1fr";
+  } else {
+    const dx = event.clientX - startX;
+    let newLeftWidth = startLeftWidth + dx / rect.width;
+    const minFraction = 150 / rect.width;
+    const maxFraction = 1 - minFraction;
+    if (newLeftWidth < minFraction) newLeftWidth = minFraction;
+    if (newLeftWidth > maxFraction) newLeftWidth = maxFraction;
+    const rightWidth = 1 - newLeftWidth;
+    panesEl.style.gridTemplateColumns = `${newLeftWidth * 100}% auto ${rightWidth * 100}%`;
+    panesEl.style.gridTemplateRows = "";
+  }
+}
+
+function onSplitterPointerUpOrCancel(event) {
+  if (event.pointerId !== activePointerId) return;
+  isDragging = false;
+  activePointerId = null;
+  splitterEl.classList.remove("dragging");
+  splitterEl.releasePointerCapture(event.pointerId);
+  splitterEl.removeEventListener("pointermove", onSplitterPointerMove);
+  splitterEl.removeEventListener("pointerup", onSplitterPointerUpOrCancel);
+  splitterEl.removeEventListener("pointercancel", onSplitterPointerUpOrCancel);
+}
+
+// TODO: add syntax highlighting and indentation assistance for HTML elements in a later iteration.
 
 window.addEventListener("load", init);
