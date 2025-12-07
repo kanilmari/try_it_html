@@ -73,6 +73,62 @@ const TEMPLATES = {
 </html>`
 };
 
+const FORMATTER_TEMPLATE = `<!DOCTYPE html>
+<html>
+<body>
+
+<textarea id="koodi" rows="10" cols="50">
+<div><h1>Otsikko</h1><p>Tässä on tekstiä
+        joka on vähän miten sattuu</p></div>
+</textarea>
+
+<br>
+<button onclick="formatoiKoodi()">Formatoi Koodi!</button>
+
+<script src="https://unpkg.com/prettier@2.8.8/standalone.js"></script>
+<script src="https://unpkg.com/prettier@2.8.8/parser-html.js"></script>
+
+<script>
+  function formatoiKoodi() {
+    // Haetaan ruma koodi
+    const rumaKoodi = document.getElementById('koodi').value;
+
+    // 3. Tässä on se "taika": yksi funktiokutsu tekee kaiken työn
+    const kaunisKoodi = prettier.format(rumaKoodi, {
+      parser: "html",
+      plugins: prettierPlugins,
+      htmlWhitespaceSensitivity: "ignore" // Poistaa turhat välilyönnit
+    });
+
+    // Päivitetään tulos takaisin
+    document.getElementById('koodi').value = kaunisKoodi;
+  }
+</script>
+
+</body>
+</html>`;
+
+const TOOL_CONFIG = {
+  tryit: {
+    id: "tryit",
+    title: "Simple TryIt editor (HTML + CSS + JS)",
+    description: "Edit the HTML below and press <strong>Run</strong>.",
+    runLabel: "Run ▶",
+    resetLabel: "Reset template",
+    defaultCode: () => getDefaultTemplate(),
+    run: runTryIt,
+  },
+  formatter: {
+    id: "formatter",
+    title: "HTML formatter",
+    description: "Liitä HTML-koodi, paina <strong>Format</strong> ja saat siistin lähdekoodin ja esikatselun.",
+    runLabel: "Format ▶",
+    resetLabel: "Reset formatter sample",
+    defaultCode: () => FORMATTER_TEMPLATE,
+    run: runFormatter,
+  },
+};
+
 const codeTextareaEl = document.getElementById("code");
 const previewEl = document.getElementById("preview");
 const tabInfoEl = document.getElementById("tabInfo");
@@ -81,15 +137,21 @@ const themeSelectEl = document.getElementById("themeSelect");
 const previewDarkToggleEl = document.getElementById("previewDarkToggle");
 const panesEl = document.getElementById("panes");
 const splitterEl = document.getElementById("splitter");
+const appTitleEl = document.getElementById("appTitle");
+const headerDescriptionEl = document.getElementById("headerDescription");
+const runButtonEl = document.getElementById("runButton");
+const resetButtonEl = document.getElementById("resetButton");
+const tabButtons = document.querySelectorAll("[data-tool]");
 
 const STORAGE_PREFIX = "tryit-code-";
 let storageDisabled = false;
+let storageAvailable = false;
 
 const TAB_ID = getOrCreateTabId();
-const STORAGE_KEY = STORAGE_PREFIX + TAB_ID;
 
 let currentTheme = "light";
 let previewDarkMode = false;
+let activeTool = "tryit";
 
 // CodeMirror instance (created in init)
 let codeMirror = null;
@@ -102,12 +164,18 @@ let startTopHeight = 0;
 let isVerticalLayout = false;
 let activePointerId = null;
 
-tabInfoEl.textContent = "Tab id: " + TAB_ID;
+updateTabInfo();
 
 function setStatus(message, type = "info") {
   if (!statusEl) return;
   statusEl.textContent = message;
   statusEl.className = "status " + (type === "error" ? "status-error" : "status-info");
+}
+
+function updateTabInfo() {
+  if (!tabInfoEl) return;
+  const toolTitle = TOOL_CONFIG[activeTool]?.title || "TryIt";
+  tabInfoEl.textContent = `Tab id: ${TAB_ID} · Mode: ${toolTitle}`;
 }
 
 function disableStorage(reason) {
@@ -126,6 +194,10 @@ function detectStorageAvailability() {
     disableStorage("localStorage is not available, autosave disabled (likely private browsing mode).");
     return false;
   }
+}
+
+function getStorageKey() {
+  return `${STORAGE_PREFIX}${activeTool}-${TAB_ID}`;
 }
 
 function getOrCreateTabId() {
@@ -173,7 +245,7 @@ function cleanupOldEntries() {
 }
 
 function saveToStorage() {
-  if (storageDisabled) return;
+  if (storageDisabled || !storageAvailable) return;
 
   const payload = {
     code: getEditorValue(),
@@ -181,7 +253,7 @@ function saveToStorage() {
     updatedAt: Date.now()
   };
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    localStorage.setItem(getStorageKey(), JSON.stringify(payload));
     cleanupOldEntries();
   } catch (e) {
     // Quota full or storage otherwise blocked → switch to permanent private mode
@@ -190,14 +262,14 @@ function saveToStorage() {
 }
 
 function loadFromStorage() {
-  if (storageDisabled) return null;
+  if (storageDisabled || !storageAvailable) return null;
 
-  const raw = localStorage.getItem(STORAGE_KEY);
+  const raw = localStorage.getItem(getStorageKey());
   if (!raw) return null;
   try {
     return JSON.parse(raw);
   } catch (e) {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(getStorageKey());
     return null;
   }
 }
@@ -220,16 +292,11 @@ function getDefaultTemplate() {
   return TEMPLATES[currentTheme] || TEMPLATES.light;
 }
 
-function runCode() {
+function runTryIt() {
   const code = getEditorValue();
   const wrapped = wrapPreviewHtml(code, previewDarkMode);
   previewEl.srcdoc = wrapped;
   saveToStorage();
-}
-
-function resetTemplate() {
-  setEditorValue(getDefaultTemplate());
-  runCode();
 }
 
 function wrapPreviewHtml(html, useDark) {
@@ -272,6 +339,119 @@ function wrapPreviewHtml(html, useDark) {
   return themeStyle + html;
 }
 
+function escapeHtml(value) {
+  if (value === null || value === undefined) return "";
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function wrapFormatterPreview(html, useDark) {
+  const bg = useDark ? "#020617" : "#ffffff";
+  const text = useDark ? "#e5e7eb" : "#111827";
+  const border = useDark ? "#1f2937" : "#e5e7eb";
+  const accent = "#8b5cf6";
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: ${bg}; color: ${text}; margin: 0; padding: 1rem; }
+    h2 { margin-top: 0; color: ${accent}; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+    @media (min-width: 900px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .panel { border: 1px solid ${border}; border-radius: 8px; padding: 1rem; background: ${useDark ? "#0b1120" : "#f8fafc"}; }
+    pre { white-space: pre-wrap; word-break: break-word; background: ${useDark ? "#111827" : "#11182710"}; color: inherit; padding: 0.75rem; border-radius: 6px; overflow: auto; }
+    .rendered { padding: 0.75rem; border-radius: 6px; border: 1px dashed ${border}; background: ${useDark ? "#0b1120" : "#fff"}; }
+  </style>
+</head>
+<body>
+  <div class="grid">
+    <div class="panel">
+      <h2>Formatted HTML</h2>
+      <pre>${escapeHtml(html)}</pre>
+    </div>
+    <div class="panel">
+      <h2>Rendered output</h2>
+      <div class="rendered">${html}</div>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+function runFormatter() {
+  const code = getEditorValue();
+  if (typeof prettier === "undefined" || typeof prettierPlugins === "undefined") {
+    setStatus("Prettier is not available, cannot format HTML.", "error");
+    return;
+  }
+
+  try {
+    const formatted = prettier.format(code, {
+      parser: "html",
+      plugins: prettierPlugins,
+      htmlWhitespaceSensitivity: "ignore",
+    });
+
+    setEditorValue(formatted);
+    previewEl.srcdoc = wrapFormatterPreview(formatted, previewDarkMode);
+    setStatus("HTML formatted and preview updated.");
+    saveToStorage();
+  } catch (error) {
+    setStatus(`Formatting failed: ${error.message}`, "error");
+  }
+}
+
+function runActiveTool() {
+  const handler = TOOL_CONFIG[activeTool]?.run;
+  if (typeof handler === "function") {
+    handler();
+  }
+}
+
+function resetActiveTemplate() {
+  const config = TOOL_CONFIG[activeTool];
+  if (!config) return;
+  const defaultValue = config.defaultCode();
+  setEditorValue(defaultValue);
+  runActiveTool();
+}
+
+function setActiveTool(tool) {
+  if (!TOOL_CONFIG[tool]) return;
+  activeTool = tool;
+
+  tabButtons.forEach((btn) => {
+    const isActive = btn.dataset.tool === tool;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-selected", isActive ? "true" : "false");
+  });
+
+  const config = TOOL_CONFIG[tool];
+  if (appTitleEl) appTitleEl.textContent = config.title;
+  if (headerDescriptionEl) headerDescriptionEl.innerHTML = config.description;
+  if (runButtonEl) runButtonEl.textContent = config.runLabel;
+  if (resetButtonEl) resetButtonEl.textContent = config.resetLabel;
+
+  updateTabInfo();
+
+  const saved = loadFromStorage();
+  if (saved && saved.code) {
+    applyTheme(saved.theme || currentTheme || "light");
+    setEditorValue(saved.code);
+    runActiveTool();
+    return;
+  }
+
+  applyTheme(currentTheme || "light");
+  setEditorValue(config.defaultCode());
+  runActiveTool();
+}
+
 function getEditorValue() {
   if (codeMirror) {
     return codeMirror.getValue();
@@ -288,7 +468,19 @@ function setEditorValue(value) {
 }
 
 function init() {
-  const storageOk = detectStorageAvailability();
+  storageAvailable = detectStorageAvailability();
+
+  if (runButtonEl) {
+    runButtonEl.addEventListener("click", runActiveTool);
+  }
+  if (resetButtonEl) {
+    resetButtonEl.addEventListener("click", resetActiveTemplate);
+  }
+  tabButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      setActiveTool(btn.dataset.tool);
+    });
+  });
 
   // Initialize CodeMirror over the textarea if available
   if (window.CodeMirror && codeTextareaEl) {
@@ -324,7 +516,7 @@ function init() {
     previewDarkToggleEl.addEventListener("change", () => {
       previewDarkMode = previewDarkToggleEl.checked;
       // Re-run current code to apply or remove dark wrapper
-      runCode();
+      runActiveTool();
     });
   }
 
@@ -340,22 +532,12 @@ function init() {
     updateLayoutMode();
   }
 
-  if (storageOk) {
+  if (storageAvailable) {
     cleanupOldEntries();
-    const saved = loadFromStorage();
-    if (saved && saved.code) {
-      applyTheme(saved.theme || "light");
-      setEditorValue(saved.code);
-      runCode();
-      return;
-    }
   }
 
-  // either storage is not available or nothing was saved
-  applyTheme("light");
-  setEditorValue(getDefaultTemplate());
-  const wrappedInitial = wrapPreviewHtml(getEditorValue(), previewDarkMode);
-  previewEl.srcdoc = wrappedInitial; // private mode: no saving
+  applyTheme(currentTheme || "light");
+  setActiveTool(activeTool);
 }
 
 function updateLayoutMode() {
