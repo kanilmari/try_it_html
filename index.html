@@ -14,21 +14,14 @@
   <script src="vendor/codemirror/javascript.js"></script>
   <script src="vendor/codemirror/css.js"></script>
   <script src="vendor/codemirror/htmlmixed.js"></script>
-  <script src="https://unpkg.com/prettier@2.8.8/standalone.js"></script>
-  <script src="https://unpkg.com/prettier@2.8.8/parser-html.js"></script>
 </head>
 <body data-theme="light">
 <header>
   <div class="header-row">
     <div class="header-left">
-      <div class="tab-buttons" role="tablist">
-        <button class="tab-button active" role="tab" aria-selected="true" aria-controls="main" data-tool="tryit">Try it</button>
-        <button class="tab-button" role="tab" aria-selected="false" aria-controls="main" data-tool="formatter">HTML formatter</button>
-      </div>
+      <span class="app-title">Simple TryIt editor (HTML + CSS + JS)</span>
       <span class="header-separator">·</span>
-      <span class="app-title" id="appTitle">Simple TryIt editor (HTML + CSS + JS)</span>
-      <span class="header-separator">·</span>
-      <span class="header-text" id="headerDescription">Edit the HTML below and press <strong>Run</strong>.</span>
+      <span class="header-text">Edit the HTML below and press <strong>Run</strong>.</span>
       <span class="header-separator">·</span>
       <span class="tab-id" id="tabInfo"></span>
       <span class="status-inline" id="status"></span>
@@ -47,8 +40,8 @@
           Try dark mode in preview
         </label>
       </div>
-      <button class="run" id="runButton">Run ▶</button>
-      <button class="reset" id="resetButton">Reset template</button>
+      <button class="run" onclick="runCode()">Run ▶</button>
+      <button class="reset" onclick="resetTemplate()">Reset template</button>
     </div>
   </div>
 </header>
